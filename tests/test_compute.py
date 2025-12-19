@@ -58,3 +58,43 @@ async def test_compute_returns_consistent_hash(client: AsyncClient) -> None:
     # Same iterations should produce same hash
     assert data1["hash"] == data2["hash"]
     assert data1["iterations"] == data2["iterations"]
+
+
+@pytest.mark.asyncio
+async def test_compute_with_custom_iterations(client: AsyncClient) -> None:
+    """Test that compute endpoint accepts custom iterations parameter."""
+    custom_iterations = 500
+    response = await client.get(f"/compute?iterations={custom_iterations}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["iterations"] == custom_iterations
+    assert len(data["hash"]) == 64
+
+
+@pytest.mark.asyncio
+async def test_compute_custom_iterations_different_hash(client: AsyncClient) -> None:
+    """Test that different custom iterations produce different hashes."""
+    response1 = await client.get("/compute?iterations=100")
+    response2 = await client.get("/compute?iterations=200")
+
+    data1 = response1.json()
+    data2 = response2.json()
+
+    assert data1["iterations"] == 100
+    assert data2["iterations"] == 200
+    assert data1["hash"] != data2["hash"]
+
+
+@pytest.mark.asyncio
+async def test_compute_invalid_iterations_zero(client: AsyncClient) -> None:
+    """Test that compute endpoint rejects zero iterations."""
+    response = await client.get("/compute?iterations=0")
+    assert response.status_code == 422  # Validation error
+
+
+@pytest.mark.asyncio
+async def test_compute_invalid_iterations_negative(client: AsyncClient) -> None:
+    """Test that compute endpoint rejects negative iterations."""
+    response = await client.get("/compute?iterations=-100")
+    assert response.status_code == 422  # Validation error
