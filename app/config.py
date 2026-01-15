@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     compute_iterations: int = 100000
+    storage_backend_native: str = "mock"
+    storage_backend_neutral: str = "mock"
 
     model_config = SettingsConfigDict(
         env_file=".env",
