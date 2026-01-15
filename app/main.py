@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app.routers import health, quick, compute
+from app.routers import health, quick, compute, io_heavy
 
 app = FastAPI(
     title="Cloud Benchmark API",
@@ -13,3 +13,4 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(quick.router)
 app.include_router(compute.router)
+app.include_router(io_heavy.router)
