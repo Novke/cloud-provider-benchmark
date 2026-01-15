@@ -1,0 +1,8 @@
+services:
+  benchmark-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - COMPUTE_ITERATIONS=100000
+    restart: unless-stopped

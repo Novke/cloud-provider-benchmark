@@ -11,14 +11,48 @@ Empirical comparison of AWS, Azure, Google Cloud Platform, and Hetzner Cloud acr
 
 ## Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /health` | Health check, cold start detection |
-| `GET /quick` | Throughput testing (req/sec) |
-| `GET /quick?hold={ms}` | Concurrency testing (2000ms, 5000ms) |
-| `GET /compute` | CPU-intensive workload (SHA-256 iterations) |
-| `GET /io-heavy/native` | I/O test using provider's native storage |
-| `GET /io-heavy/neutral` | I/O test using Cloudflare R2 (neutral) |
+| Endpoint | Purpose | Duration |
+|----------|---------|----------|
+| `GET /health` | Health check, cold start detection | <10ms |
+| `GET /quick` | Throughput testing (req/sec) | <50ms |
+| `GET /quick?hold={ms}` | Concurrency testing (2000ms, 5000ms) | 2-5s |
+| `GET /compute` | CPU-intensive workload (SHA-256 iterations) | 2-3s |
+| `GET /compute?iterations={n}` | Custom iteration count | Variable |
+| `GET /io-heavy/native` | I/O test using provider's native storage | 1-2s |
+| `GET /io-heavy/neutral` | I/O test using Cloudflare R2 (neutral) | 1-2s |
+
+### Endpoint Examples
+
+**Health Check:**
+```bash
+curl http://localhost:8890/health
+# Response: {"status": "healthy"}
+```
+
+**Quick - Baseline Latency:**
+```bash
+curl http://localhost:8890/quick
+# Response: {"message": "ok", "hold_ms": 0}
+```
+
+**Quick - With Hold (Concurrency Test):**
+```bash
+curl http://localhost:8890/quick?hold=2000
+# Response: {"message": "ok", "hold_ms": 2000}
+# Takes 2 seconds to respond
+```
+
+**Compute - Default Iterations:**
+```bash
+curl http://localhost:8890/compute
+# Response: {"hash": "a3f7b2c...", "iterations": 100000}
+```
+
+**Compute - Custom Iterations:**
+```bash
+curl http://localhost:8890/compute?iterations=500
+# Response: {"hash": "b4e8c3d...", "iterations": 500}
+```
 
 ## Tech Stack
 
@@ -29,21 +63,85 @@ Empirical comparison of AWS, Azure, Google Cloud Platform, and Hetzner Cloud acr
 
 ## Getting Started
 
-```bash
-# Local
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+### Running Locally
 
-# Docker
+1. **Create virtual environment:**
+```bash
+python -m venv venv
+```
+
+2. **Activate virtual environment:**
+```bash
+# Windows
+.\venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
+```
+
+3. **Install dependencies:**
+```bash
+pip install -r requirements-dev.txt
+```
+
+4. **Create .env file (optional):**
+```bash
+cp .env.example .env
+# Edit .env to customize COMPUTE_ITERATIONS
+```
+
+5. **Run the application:**
+```bash
+uvicorn app.main:app --reload --port 8890
+```
+
+API available at: `http://localhost:8890`
+API docs (Swagger): `http://localhost:8890/docs`
+
+### Running with Docker
+
+**Using Docker Compose (recommended):**
+```bash
 docker-compose up --build
 ```
 
+**Using Docker directly:**
+```bash
+# Build image
+docker build -t cloud-benchmark .
+
+# Run container
+docker run -p 8000:8000 -e COMPUTE_ITERATIONS=100000 cloud-benchmark
+```
+
+API available at: `http://localhost:8000`
+
 ## Testing
 
+**Run all tests:**
 ```bash
-pip install -r requirements-dev.txt
 pytest
 ```
+
+**Run with verbose output:**
+```bash
+pytest -v
+```
+
+**Run specific test file:**
+```bash
+pytest tests/test_health.py
+pytest tests/test_quick.py
+pytest tests/test_compute.py
+```
+
+## Configuration
+
+Environment variables (create `.env` file):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `COMPUTE_ITERATIONS` | Number of SHA-256 iterations for /compute | 100000 |
 
 ## Project Structure
 
