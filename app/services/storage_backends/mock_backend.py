@@ -1,16 +1,26 @@
 """Mock storage backend for testing and development."""
 
-from typing import Dict
+from typing import Dict, ClassVar
 
 from .base import StorageBackend
 
 
 class MockStorageBackend(StorageBackend):
-    """In-memory mock storage backend for testing."""
+    """
+    In-memory mock storage backend for testing.
+
+    Uses class-level storage (singleton pattern) so all instances
+    share the same data. This allows tests to verify data integrity
+    across different backend instances.
+    """
+
+    # Class-level storage shared by all instances (singleton-like)
+    _shared_storage: ClassVar[Dict[str, bytes]] = {}
 
     def __init__(self):
-        """Initialize mock storage with empty dictionary."""
-        self._storage: Dict[str, bytes] = {}
+        """Initialize mock storage (uses shared class-level storage)."""
+        # Instance uses class-level storage
+        pass
 
     async def read(self, key: str) -> bytes:
         """
@@ -25,9 +35,9 @@ class MockStorageBackend(StorageBackend):
         Raises:
             KeyError: If key does not exist.
         """
-        if key not in self._storage:
+        if key not in MockStorageBackend._shared_storage:
             raise KeyError(f"Key '{key}' not found in storage")
-        return self._storage[key]
+        return MockStorageBackend._shared_storage[key]
 
     async def write(self, key: str, data: bytes) -> None:
         """
@@ -37,4 +47,9 @@ class MockStorageBackend(StorageBackend):
             key: Storage key.
             data: Data to write.
         """
-        self._storage[key] = data
+        MockStorageBackend._shared_storage[key] = data
+
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all data from shared storage (useful for tests)."""
+        cls._shared_storage.clear()

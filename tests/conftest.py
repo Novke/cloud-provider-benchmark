@@ -5,6 +5,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
+from app.services.storage_backends import MockStorageBackend
 
 
 @pytest_asyncio.fixture
@@ -19,3 +20,18 @@ async def client():
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+
+
+@pytest.fixture(autouse=True)
+def cleanup_mock_storage():
+    """
+    Automatically clear MockStorageBackend shared storage after each test.
+
+    This fixture runs automatically (autouse=True) for every test,
+    ensuring test isolation by cleaning up any data written to
+    the mock storage backend.
+    """
+    # Setup: nothing needed before test
+    yield
+    # Teardown: clear storage after test
+    MockStorageBackend.clear()
