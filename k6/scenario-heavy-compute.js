@@ -185,8 +185,8 @@ export function handleSummary(data) {
 
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-        'results/heavy-compute-summary.json': JSON.stringify(data, null, 2),
-        'results/heavy-compute-analysis.json': JSON.stringify(summary, null, 2),
+        'k6/results/heavy-compute-summary.json': JSON.stringify(data, null, 2),
+        'k6/results/heavy-compute-analysis.json': JSON.stringify(summary, null, 2),
     };
 }
 

@@ -15,6 +15,7 @@ if "%~1"=="" (
 set BASE_URL=%~1
 
 cd /d "%~dp0..\.."
+if not exist k6\results mkdir k6\results
 
 echo === Full Cloud Benchmark ===
 echo Target: %BASE_URL%

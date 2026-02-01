@@ -30,6 +30,7 @@ set BASE_URL=%~1
 set SCENARIO=%~2
 
 cd /d "%~dp0..\.."
+if not exist k6\results mkdir k6\results
 
 echo === Cloud Single Scenario ===
 echo Target: %BASE_URL%

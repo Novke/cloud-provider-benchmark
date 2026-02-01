@@ -179,10 +179,10 @@ k6 run -e COMPUTE_ITERATIONS=500000 k6/scenario-heavy-compute.js   # heavy
 mkdir -p results
 
 # Run with JSON output
-k6 run --out json=results/raw-output.json k6/scenario-mixed.js
+k6 run --out json=k6/results/raw-output.json k6/scenario-mixed.js
 ```
 
-Summary files are automatically created in `results/` directory:
+Summary files are automatically created in `k6/results/` directory:
 - `*-summary.json`: Full k6 summary data
 - `*-analysis.json`: Extracted metrics with config info
 
@@ -240,14 +240,14 @@ k6\scripts\cloud-full-benchmark.bat https://gcp-app.com
 ### 4. Comparison
 ```bash
 # Collect all results
-ls results/*.json
+ls k6/results/*.json
 
 # Compare p95 latencies, error rates, cold start times
 ```
 
 ## Output Files
 
-After running scripts, check `results/` for:
+After running scripts, check `k6/results/` for:
 - `low-traffic-summary.json`, `low-traffic-analysis.json`
 - `high-traffic-summary.json`, `high-traffic-analysis.json`
 - `heavy-compute-summary.json`, `heavy-compute-analysis.json`

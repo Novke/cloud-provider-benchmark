@@ -8,6 +8,7 @@ echo Duration: ~1-2 min per scenario
 echo.
 
 cd /d "%~dp0..\.."
+if not exist k6\results mkdir k6\results
 
 echo [1/4] Running high-traffic scenario...
 k6 run k6/scenario-high-traffic.js

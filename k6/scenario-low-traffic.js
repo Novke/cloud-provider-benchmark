@@ -107,8 +107,8 @@ export function handleSummary(data) {
 
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-        'results/low-traffic-summary.json': JSON.stringify(data, null, 2),
-        'results/low-traffic-analysis.json': JSON.stringify(summary, null, 2),
+        'k6/results/low-traffic-summary.json': JSON.stringify(data, null, 2),
+        'k6/results/low-traffic-analysis.json': JSON.stringify(summary, null, 2),
     };
 }
 
