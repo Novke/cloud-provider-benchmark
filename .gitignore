@@ -208,3 +208,6 @@ __marimo__/
 
 nul
 CL*.md
+
+# k6 load testing results
+k6/results/
