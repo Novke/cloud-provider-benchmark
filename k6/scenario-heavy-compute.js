@@ -3,11 +3,22 @@
  *
  * Purpose: Test cold start, CPU limits, timeouts
  * Pattern: 10-100 concurrent requests to /compute
- * Endpoints: /compute with default iterations
+ * Endpoints: /compute with configurable iterations
+ *
+ * Environment Variables:
+ *   BASE_URL           - Target server (auto-detects local/cloud profile)
+ *   PROFILE            - Override: 'local' or 'cloud'
+ *   COMPUTE_ITERATIONS - Iterations: 1000 (light), 100000 (default), 500000 (heavy)
+ *   VUS                - Override max virtual users
  *
  * Run:
  *   k6 run k6/scenario-heavy-compute.js
  *   k6 run -e BASE_URL=https://your-cloud-url.com k6/scenario-heavy-compute.js
+ *
+ * Test Sub-Cases (COMPUTE_ITERATIONS variations):
+ *   k6 run -e COMPUTE_ITERATIONS=1000 k6/scenario-heavy-compute.js    # light (cold start focus)
+ *   k6 run -e COMPUTE_ITERATIONS=100000 k6/scenario-heavy-compute.js  # default (~2-3s)
+ *   k6 run -e COMPUTE_ITERATIONS=500000 k6/scenario-heavy-compute.js  # heavy (stress/timeout)
  *
  * Output JSON:
  *   k6 run --out json=results/heavy-compute.json k6/scenario-heavy-compute.js
@@ -16,7 +27,13 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate, Trend, Counter } from 'k6/metrics';
-import { BASE_URL, endpoints, computeThresholds } from './config.js';
+import {
+    profile,
+    computeThresholds,
+    getComputeUrl,
+    COMPUTE_ITERATIONS,
+    getConfigSummary,
+} from './config.js';
 
 // Custom metrics
 const errorRate = new Rate('errors');
@@ -24,61 +41,100 @@ const timeoutRate = new Rate('timeouts');
 const computeLatency = new Trend('compute_latency');
 const successfulComputes = new Counter('successful_computes');
 
-export const options = {
-    scenarios: {
-        // Constant load: 10 concurrent requests
-        constant_load: {
-            executor: 'constant-vus',
-            vus: 10,
-            duration: '2m',
-            startTime: '0s',
-        },
-        // Spike: Burst to 50 concurrent
-        spike: {
-            executor: 'constant-vus',
-            vus: 50,
-            duration: '1m',
-            startTime: '2m',
-        },
-        // Peak: 100 concurrent (stress test)
-        peak: {
-            executor: 'constant-vus',
-            vus: 100,
-            duration: '1m',
-            startTime: '3m',
-        },
-        // Cool-down
-        cooldown: {
-            executor: 'constant-vus',
-            vus: 10,
-            duration: '1m',
-            startTime: '4m',
-        },
+// Calculate durations based on profile
+const constantDuration = profile.durations.sustain;
+const spikeDuration = profile.durations.peak;
+const cooldownDuration = profile.durations.cooldown;
+
+// Calculate start times
+function parseDuration(d) {
+    const match = d.match(/(\d+)(s|m)/);
+    if (!match) return 0;
+    const value = parseInt(match[1], 10);
+    return match[2] === 'm' ? value * 60 : value;
+}
+
+const constantSeconds = parseDuration(constantDuration);
+const spikeSeconds = parseDuration(spikeDuration);
+
+// Build scenarios based on profile
+const scenarios = {
+    // Constant load: low concurrent requests
+    constant_load: {
+        executor: 'constant-vus',
+        vus: Math.ceil(profile.vus.warmup / 5), // ~4-20 VUs depending on profile
+        duration: constantDuration,
+        startTime: '0s',
     },
-    thresholds: {
-        ...computeThresholds,
-        errors: ['rate<0.05'],           // Allow up to 5% errors
-        timeouts: ['rate<0.10'],         // Allow up to 10% timeouts
-        compute_latency: ['p(95)<5000'], // 95% under 5s
+    // Spike: Burst to moderate concurrent
+    spike: {
+        executor: 'constant-vus',
+        vus: Math.ceil(profile.vus.moderate / 4), // ~12-50 VUs
+        duration: spikeDuration,
+        startTime: `${constantSeconds}s`,
+    },
+    // Peak: Higher concurrent (stress test)
+    peak: {
+        executor: 'constant-vus',
+        vus: Math.ceil(profile.vus.peak / 5), // ~10-100 VUs
+        duration: spikeDuration,
+        startTime: `${constantSeconds + spikeSeconds}s`,
+    },
+    // Cool-down
+    cooldown: {
+        executor: 'constant-vus',
+        vus: Math.ceil(profile.vus.warmup / 10), // ~2-10 VUs
+        duration: cooldownDuration,
+        startTime: `${constantSeconds + spikeSeconds * 2}s`,
     },
 };
 
+// Adjust timeout threshold based on iterations
+// Rough estimation: 100000 iterations ~= 2-3s, scale accordingly
+const estimatedDuration = Math.ceil((COMPUTE_ITERATIONS / 100000) * 3000);
+const timeoutThreshold = Math.max(10000, estimatedDuration * 3); // At least 10s, up to 3x estimated
+
+export const options = {
+    scenarios: scenarios,
+    thresholds: {
+        ...computeThresholds,
+        errors: ['rate<0.05'],
+        timeouts: ['rate<0.10'],
+        compute_latency: [`p(95)<${Math.min(timeoutThreshold, 30000)}`],
+    },
+};
+
+// Build the request URL once
+const computeUrl = getComputeUrl();
+
+export function setup() {
+    const config = getConfigSummary();
+    console.log('=== Heavy Compute Scenario ===');
+    console.log(`Profile: ${config.profile}`);
+    console.log(`Iterations: ${config.computeIterations}`);
+    console.log(`Estimated Duration: ~${estimatedDuration}ms per request`);
+    console.log(`Max VUs: ${Math.ceil(profile.vus.peak / 5)}`);
+    console.log(`URL: ${computeUrl}`);
+    console.log('==============================');
+    return config;
+}
+
 export default function () {
-    const url = `${BASE_URL}${endpoints.compute}`;
     const start = Date.now();
 
-    // Longer timeout for compute endpoint (30 seconds)
-    const response = http.get(url, { timeout: '30s' });
+    // Longer timeout for compute endpoint (30 seconds min, scale with iterations)
+    const timeout = `${Math.ceil(timeoutThreshold / 1000)}s`;
+    const response = http.get(computeUrl, { timeout: timeout });
     const duration = Date.now() - start;
 
     // Record latency
     computeLatency.add(duration);
 
     // Check for timeout
-    if (response.status === 0 || duration >= 30000) {
+    if (response.status === 0 || duration >= timeoutThreshold) {
         timeoutRate.add(1);
         errorRate.add(1);
-        console.log(`TIMEOUT: ${duration}ms`);
+        console.log(`TIMEOUT: ${duration}ms (threshold: ${timeoutThreshold}ms)`);
         return;
     }
 
@@ -92,7 +148,7 @@ export default function () {
                 return false;
             }
         },
-        'completed under 10s': (r) => r.timings.duration < 10000,
+        [`completed under ${timeoutThreshold}ms`]: (r) => r.timings.duration < timeoutThreshold,
     });
 
     if (success) {
@@ -106,9 +162,31 @@ export default function () {
 }
 
 export function handleSummary(data) {
+    const config = getConfigSummary();
+    const summary = {
+        timestamp: new Date().toISOString(),
+        config: config,
+        estimatedDurationMs: estimatedDuration,
+        timeoutThresholdMs: timeoutThreshold,
+        metrics: {
+            successful_computes: data.metrics.successful_computes?.values?.count || 0,
+            error_rate: data.metrics.errors?.values?.rate || 0,
+            timeout_rate: data.metrics.timeouts?.values?.rate || 0,
+            latency: {
+                avg: data.metrics.compute_latency?.values?.avg,
+                min: data.metrics.compute_latency?.values?.min,
+                max: data.metrics.compute_latency?.values?.max,
+                p50: data.metrics.compute_latency?.values?.['p(50)'],
+                p95: data.metrics.compute_latency?.values?.['p(95)'],
+                p99: data.metrics.compute_latency?.values?.['p(99)'],
+            },
+        },
+    };
+
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
         'results/heavy-compute-summary.json': JSON.stringify(data, null, 2),
+        'results/heavy-compute-analysis.json': JSON.stringify(summary, null, 2),
     };
 }
 

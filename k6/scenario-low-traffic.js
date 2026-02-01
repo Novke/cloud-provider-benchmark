@@ -2,8 +2,12 @@
  * Scenario 1: Low Traffic
  *
  * Purpose: Compare idle costs vs pay-per-request models
- * Pattern: 1 request every 30-60 seconds for 10 minutes
- * Endpoints: All endpoints in rotation
+ * Pattern: 1 request every 30-60 seconds (2 req/min)
+ * Endpoints: All endpoints in rotation (excludes /io-heavy in local profile)
+ *
+ * Environment Variables:
+ *   BASE_URL  - Target server (auto-detects local/cloud profile)
+ *   PROFILE   - Override: 'local' or 'cloud'
  *
  * Run:
  *   k6 run k6/scenario-low-traffic.js
@@ -14,15 +18,38 @@
  */
 
 import { sleep } from 'k6';
-import { BASE_URL, makeRequest, endpoints, thresholds } from './config.js';
+import {
+    BASE_URL,
+    makeRequest,
+    endpoints,
+    thresholds,
+    profile,
+    getConfigSummary,
+} from './config.js';
+
+// Build endpoint list based on profile
+const endpointList = profile.includeIO
+    ? [
+        endpoints.health,
+        endpoints.quick,
+        endpoints.compute,
+        endpoints.ioNative,
+        endpoints.ioNeutral,
+    ]
+    : [
+        // Local profile: skip /io-heavy endpoints
+        endpoints.health,
+        endpoints.quick,
+        endpoints.compute,
+    ];
 
 export const options = {
     scenarios: {
         low_traffic: {
             executor: 'constant-arrival-rate',
-            rate: 2,              // 2 requests per minute
+            rate: 2,                                    // 2 requests per minute
             timeUnit: '1m',
-            duration: '10m',      // Run for 10 minutes
+            duration: profile.durations.total,          // Profile-based duration
             preAllocatedVUs: 1,
             maxVUs: 5,
         },
@@ -32,13 +59,18 @@ export const options = {
 
 // Track which endpoint to call next (round-robin)
 let endpointIndex = 0;
-const endpointList = [
-    endpoints.health,
-    endpoints.quick,
-    endpoints.compute,
-    endpoints.ioNative,
-    endpoints.ioNeutral,
-];
+
+export function setup() {
+    const config = getConfigSummary();
+    console.log('=== Low Traffic Scenario ===');
+    console.log(`Profile: ${config.profile}`);
+    console.log(`Duration: ${config.durations.total}`);
+    console.log(`Include IO: ${config.includeIO}`);
+    console.log(`Endpoints: ${endpointList.join(', ')}`);
+    console.log(`Base URL: ${config.baseUrl}`);
+    console.log('============================');
+    return config;
+}
 
 export default function () {
     // Rotate through endpoints
@@ -54,9 +86,29 @@ export default function () {
 }
 
 export function handleSummary(data) {
+    const config = getConfigSummary();
+    const summary = {
+        timestamp: new Date().toISOString(),
+        config: config,
+        endpointsTested: endpointList,
+        metrics: {
+            total_requests: data.metrics.http_reqs?.values?.count || 0,
+            error_rate: data.metrics.http_req_failed?.values?.rate || 0,
+            latency: {
+                avg: data.metrics.http_req_duration?.values?.avg,
+                min: data.metrics.http_req_duration?.values?.min,
+                max: data.metrics.http_req_duration?.values?.max,
+                p50: data.metrics.http_req_duration?.values?.['p(50)'],
+                p95: data.metrics.http_req_duration?.values?.['p(95)'],
+                p99: data.metrics.http_req_duration?.values?.['p(99)'],
+            },
+        },
+    };
+
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
         'results/low-traffic-summary.json': JSON.stringify(data, null, 2),
+        'results/low-traffic-analysis.json': JSON.stringify(summary, null, 2),
     };
 }
 
