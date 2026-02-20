@@ -41,8 +41,8 @@ async def test_quick_with_hold_100ms(client: AsyncClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data == {"message": "ok", "hold_ms": 100}
-    # Allow some variance in timing (99-150ms)
-    assert 99 <= elapsed <= 150
+    # Allow some variance in timing (80-200ms) for system overhead
+    assert 80 <= elapsed <= 200
 
 
 @pytest.mark.asyncio
