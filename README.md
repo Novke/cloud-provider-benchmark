@@ -118,22 +118,31 @@ API available at: `http://localhost:8000`
 
 ## Testing
 
+The project includes comprehensive test coverage with **49 tests** covering all endpoints and functionality.
+
 **Run all tests:**
 ```bash
-pytest
+pytest tests/
 ```
 
 **Run with verbose output:**
 ```bash
-pytest -v
+pytest tests/ -v
 ```
 
 **Run specific test file:**
 ```bash
-pytest tests/test_health.py
-pytest tests/test_quick.py
-pytest tests/test_compute.py
+pytest tests/test_health.py          # Health endpoint (2 tests)
+pytest tests/test_quick.py           # Quick endpoint (7 tests)
+pytest tests/test_compute.py         # Compute endpoint (9 tests)
+pytest tests/test_io_heavy.py        # I/O heavy endpoints (10 tests)
+pytest tests/test_integration.py    # Integration tests (9 tests)
 ```
+
+**Test categories:**
+- **Unit tests**: Individual endpoint and service tests
+- **Integration tests**: Full workflow and concurrent request tests
+- **Data integrity tests**: Verify storage operations work correctly
 
 ## Configuration
 
@@ -142,22 +151,61 @@ Environment variables (create `.env` file):
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `COMPUTE_ITERATIONS` | Number of SHA-256 iterations for /compute | 100000 |
+| `STORAGE_BACKEND_NATIVE` | Storage backend for /io-heavy/native | mock |
+| `STORAGE_BACKEND_NEUTRAL` | Storage backend for /io-heavy/neutral | mock |
 
 ## Project Structure
 
 ```
-app/
-├── main.py              # FastAPI application
-├── config.py            # Configuration
-├── routers/             # API endpoints
-│   ├── health.py
-│   ├── quick.py
-│   ├── compute.py
-│   └── io_heavy.py
-└── services/            # Business logic
-    ├── compute_service.py
-    └── storage_service.py
+cloud-provider-benchmark/
+├── app/
+│   ├── main.py                      # FastAPI app, router registration
+│   ├── config.py                    # Pydantic settings (env vars)
+│   ├── routers/                     # API endpoints
+│   │   ├── health.py                # GET /health
+│   │   ├── quick.py                 # GET /quick?hold={ms}
+│   │   ├── compute.py               # GET /compute?iterations={n}
+│   │   └── io_heavy.py              # GET /io-heavy/native & /neutral
+│   └── services/                    # Business logic
+│       ├── compute_service.py       # SHA-256 iterative hashing
+│       ├── storage_service.py       # Factory for storage backends
+│       └── storage_backends/        # Pluggable storage system
+│           ├── base.py              # StorageBackend ABC
+│           ├── mock_backend.py      # In-memory (singleton pattern)
+│           └── README.md            # Documentation for adding backends
+├── tests/
+│   ├── conftest.py                  # Pytest fixtures + cleanup
+│   ├── test_health.py               # 2 tests
+│   ├── test_quick.py                # 7 tests
+│   ├── test_compute.py              # 9 tests
+│   ├── test_io_heavy.py             # 10 tests (incl. data integrity)
+│   ├── test_integration.py          # 9 tests (concurrent, full workflow)
+│   └── test_services/               # Service layer tests
+│       ├── test_compute_service.py  # 5 tests
+│       └── test_storage_service.py  # 7 tests
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── requirements-dev.txt
+├── .env.example
+└── README.md
 ```
+
+## Architecture Decisions
+
+### Async vs Sync Endpoints
+- **Sync**: `/compute` (CPU-bound work doesn't benefit from async)
+- **Async**: `/quick`, `/io-heavy/*` (I/O-bound operations)
+
+### Storage Backend Pattern
+- Abstract base class `StorageBackend` with `read()` and `write()` methods
+- Pluggable backends in separate files under `storage_backends/`
+- MockStorageBackend uses singleton pattern (ClassVar) for test verification
+- Future: S3, Azure Blob, GCS, Hetzner, R2 backends
+
+### Test Isolation
+- `conftest.py` has `autouse=True` fixture that clears MockStorageBackend after each test
+- Ensures no data leakage between tests
 
 ## Test Scenarios
 
