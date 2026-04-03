@@ -209,5 +209,6 @@ __marimo__/
 nul
 CL*.md
 
-# k6 load testing results
+# k6 load testing results and environment configs (contain IPs/secrets)
 k6/results/
+k6/env/
