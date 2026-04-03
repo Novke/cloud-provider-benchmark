@@ -5,4 +5,12 @@ services:
       - "8000:8000"
     environment:
       - COMPUTE_ITERATIONS=100000
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
     restart: unless-stopped
