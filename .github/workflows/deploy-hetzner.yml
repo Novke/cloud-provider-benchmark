@@ -1,24 +1,16 @@
 name: Deploy to Hetzner VPS
 
 on:
+  workflow_run:
+    workflows: ["Run Tests"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
-      compute_iterations:
-        description: 'COMPUTE_ITERATIONS env var'
-        required: false
-        default: '100000'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,15 +26,12 @@ jobs:
         env:
           HETZNER_HOST: ${{ secrets.HETZNER_HOST }}
           HETZNER_USER: ${{ secrets.HETZNER_USER }}
-          COMPUTE_ITERATIONS: ${{ github.event.inputs.compute_iterations }}
         run: |
           ssh -i ~/.ssh/deploy_key $HETZNER_USER@$HETZNER_HOST << 'ENDSSH'
             set -e
 
-            # Navigate to project directory
             cd /srv/backend/cloud-benchmark
 
-            # Pull latest code (or clone if first time)
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }}.git .
             else
@@ -50,22 +39,17 @@ jobs:
               git reset --hard origin/main
             fi
 
-            # Create .env file
             cat > .env << EOF
-          COMPUTE_ITERATIONS=${{ github.event.inputs.compute_iterations }}
+          COMPUTE_ITERATIONS=100000
           STORAGE_BACKEND_NATIVE=mock
           STORAGE_BACKEND_NEUTRAL=mock
           EOF
 
-            # Build and restart containers
             sudo docker-compose down || true
             sudo docker-compose build
             sudo docker-compose up -d
 
-            # Wait for health check
             sleep 5
-
-            # Verify deployment
             curl -f http://localhost:8000/health || echo "Health check failed"
           ENDSSH
 
