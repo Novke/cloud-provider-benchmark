@@ -239,6 +239,22 @@ export function getConfigSummary() {
     };
 }
 
+// Results directory - set by bat scripts via K6_RESULTS_DIR env var
+// Falls back to k6/results for backward compatibility
+export const RESULTS_DIR = __ENV.K6_RESULTS_DIR || 'k6/results';
+
+/**
+ * Build output paths for handleSummary
+ * @param {string} scenarioName - e.g. 'mixed', 'high-traffic'
+ * @returns {object} { summary: path, analysis: path }
+ */
+export function getResultPaths(scenarioName) {
+    return {
+        summary: `${RESULTS_DIR}/${scenarioName}-summary.json`,
+        analysis: `${RESULTS_DIR}/${scenarioName}-analysis.json`,
+    };
+}
+
 /**
  * Log configuration at test start
  */

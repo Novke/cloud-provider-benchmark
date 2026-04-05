@@ -39,6 +39,7 @@ import {
     endpoints,
     thresholds,
     getConfigSummary,
+    getResultPaths,
 } from './config.js';
 
 // Per-endpoint metrics
@@ -151,6 +152,7 @@ export default function () {
 
 export function handleSummary(data) {
     const config = getConfigSummary();
+    const paths = getResultPaths('mixed');
 
     // Build endpoint stats - only include IO if present
     const endpointStats = {
@@ -169,15 +171,24 @@ export function handleSummary(data) {
         config: config,
         metrics: {
             total_requests: data.metrics.total_requests?.values?.count || 0,
+            throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
             error_rate: data.metrics.errors?.values?.rate || 0,
+            ttfb: {
+                avg: data.metrics.http_req_waiting?.values?.avg,
+                min: data.metrics.http_req_waiting?.values?.min,
+                max: data.metrics.http_req_waiting?.values?.max,
+                p50: data.metrics.http_req_waiting?.values?.['p(50)'],
+                p95: data.metrics.http_req_waiting?.values?.['p(95)'],
+                p99: data.metrics.http_req_waiting?.values?.['p(99)'],
+            },
             endpoints: endpointStats,
         },
     };
 
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-        'k6/results/mixed-summary.json': JSON.stringify(data, null, 2),
-        'k6/results/mixed-analysis.json': JSON.stringify(summary, null, 2),
+        [paths.summary]: JSON.stringify(data, null, 2),
+        [paths.analysis]: JSON.stringify(summary, null, 2),
     };
 }
 

@@ -25,6 +25,7 @@ import {
     thresholds,
     profile,
     getConfigSummary,
+    getResultPaths,
 } from './config.js';
 
 // Build endpoint list based on profile
@@ -87,12 +88,14 @@ export default function () {
 
 export function handleSummary(data) {
     const config = getConfigSummary();
+    const paths = getResultPaths('low-traffic');
     const summary = {
         timestamp: new Date().toISOString(),
         config: config,
         endpointsTested: endpointList,
         metrics: {
             total_requests: data.metrics.http_reqs?.values?.count || 0,
+            throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
             error_rate: data.metrics.http_req_failed?.values?.rate || 0,
             latency: {
                 avg: data.metrics.http_req_duration?.values?.avg,
@@ -102,13 +105,21 @@ export function handleSummary(data) {
                 p95: data.metrics.http_req_duration?.values?.['p(95)'],
                 p99: data.metrics.http_req_duration?.values?.['p(99)'],
             },
+            ttfb: {
+                avg: data.metrics.http_req_waiting?.values?.avg,
+                min: data.metrics.http_req_waiting?.values?.min,
+                max: data.metrics.http_req_waiting?.values?.max,
+                p50: data.metrics.http_req_waiting?.values?.['p(50)'],
+                p95: data.metrics.http_req_waiting?.values?.['p(95)'],
+                p99: data.metrics.http_req_waiting?.values?.['p(99)'],
+            },
         },
     };
 
     return {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
-        'k6/results/low-traffic-summary.json': JSON.stringify(data, null, 2),
-        'k6/results/low-traffic-analysis.json': JSON.stringify(summary, null, 2),
+        [paths.summary]: JSON.stringify(data, null, 2),
+        [paths.analysis]: JSON.stringify(summary, null, 2),
     };
 }
 

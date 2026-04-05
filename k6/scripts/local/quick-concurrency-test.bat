@@ -7,4 +7,4 @@ for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set DATEDIR=%%c-%%a-%%b
 if not exist k6\results\local\%DATEDIR% mkdir k6\results\local\%DATEDIR%
 
 echo === Quick Concurrency Test (HOLD_MS=1000) ===
-k6 run -e HOLD_MS=1000 --out json=k6/results/local/%DATEDIR%/quick-concurrency.json k6/scenario-high-traffic.js
+k6 run -e HOLD_MS=1000 -e K6_RESULTS_DIR=k6/results/local/%DATEDIR% k6/scenario-high-traffic.js

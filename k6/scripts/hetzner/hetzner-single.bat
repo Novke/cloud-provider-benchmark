@@ -1,5 +1,5 @@
 @echo off
-REM Run a single scenario against Hetzner VPS
+REM Run a single scenario against Hetzner VPS (full cloud durations)
 REM
 REM Usage:
 REM   hetzner-single.bat high-traffic
@@ -10,7 +10,7 @@ REM   hetzner-single.bat low-traffic
 call "%~dp0..\..\env\hetzner.bat"
 
 if "%HETZNER_IP%"=="YOUR_HETZNER_IP_HERE" (
-    echo ERROR: Update HETZNER_IP in k6/env/hetzner.env first
+    echo ERROR: Update HETZNER_IP in k6/env/hetzner.bat first
     exit /b 1
 )
 
@@ -24,7 +24,6 @@ if "%~1"=="" (
 set SCENARIO=%~1
 
 cd /d "%~dp0..\..\.."
-
 for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set DATEDIR=%%c-%%a-%%b
 if not exist k6\results\hetzner\%DATEDIR% mkdir k6\results\hetzner\%DATEDIR%
 
@@ -39,4 +38,4 @@ if errorlevel 1 (
     exit /b 1
 )
 
-k6 run -e BASE_URL=%HETZNER_URL% --out json=k6/results/hetzner/%DATEDIR%/%SCENARIO%.json k6/scenario-%SCENARIO%.js
+k6 run -e BASE_URL=%HETZNER_URL% -e K6_RESULTS_DIR=k6/results/hetzner/%DATEDIR% k6/scenario-%SCENARIO%.js

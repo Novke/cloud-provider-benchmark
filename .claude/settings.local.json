@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip install:*)",
+      "Bash(python -m venv:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(venvScriptspython.exe -m pip install -r requirements-dev.txt)",
+      "Bash(./venv/Scripts/python.exe -m pip install:*)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_health.py -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_quick.py -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_services/test_compute_service.py -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_compute.py -v)",
+      "Bash(./venv/Scripts/python.exe:*)",
+      "Bash(docker:*)",
+      "Bash(dir /s \"C:\\\\Users\\\\Novica\\\\Documents\\\\MyDocs\\\\Imp\\\\Fax\\\\DAS\\\\Cloud Computing\\\\Sotfver\\\\cloud-provider-benchmark\")",
+      "Bash(.venvScriptspython.exe -m pytest tests/test_integration.py -v)",
+      "Bash(\"C:\\\\Users\\\\Novica\\\\Documents\\\\MyDocs\\\\Imp\\\\Fax\\\\DAS\\\\Cloud Computing\\\\Sotfver\\\\cloud-provider-benchmark\\\\venv\\\\Scripts\\\\python.exe\" -m pytest:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(k6 version:*)",
+      "Bash(k6 inspect:*)",
+      "Bash(findstr:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(timeout /t 3)",
+      "Bash(curl:*)",
+      "Bash(ping:*)",
+      "Bash(set:*)",
+      "Bash(git:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
