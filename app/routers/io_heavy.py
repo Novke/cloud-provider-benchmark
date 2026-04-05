@@ -2,19 +2,23 @@
 
 import os
 import time
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.config import settings
 from app.services.storage_service import get_storage_backend
 
 router = APIRouter(tags=["benchmark"], prefix="/io-heavy")
 
+# 100MB max to prevent abuse
+MAX_BYTES = 100 * 1024 * 1024
 
-async def _run_io_benchmark(backend_type: str, storage_label: str) -> dict:
+
+async def _run_io_benchmark(backend_type: str, storage_label: str, size_bytes: int) -> dict:
     """Run write/read benchmark and return timing metrics."""
     backend = get_storage_backend(backend_type)
-    data = os.urandom(1024)
+    data = os.urandom(size_bytes)
     key = f"benchmark-test-{storage_label}"
 
     t0 = time.time()
@@ -39,12 +43,16 @@ async def _run_io_benchmark(backend_type: str, storage_label: str) -> dict:
 
 
 @router.get("/native")
-async def io_heavy_native() -> dict:
+async def io_heavy_native(
+    bytes: Optional[int] = Query(default=1024, ge=1, le=MAX_BYTES, description="Payload size in bytes")
+) -> dict:
     """I/O heavy endpoint using cloud provider's native storage."""
-    return await _run_io_benchmark(settings.storage_backend_native, "native")
+    return await _run_io_benchmark(settings.storage_backend_native, "native", bytes)
 
 
 @router.get("/neutral")
-async def io_heavy_neutral() -> dict:
+async def io_heavy_neutral(
+    bytes: Optional[int] = Query(default=1024, ge=1, le=MAX_BYTES, description="Payload size in bytes")
+) -> dict:
     """I/O heavy endpoint using neutral storage (Cloudflare R2)."""
-    return await _run_io_benchmark(settings.storage_backend_neutral, "neutral")
+    return await _run_io_benchmark(settings.storage_backend_neutral, "neutral", bytes)

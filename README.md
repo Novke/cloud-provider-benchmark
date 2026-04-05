@@ -20,38 +20,40 @@ Empirical comparison of AWS, Azure, Google Cloud Platform, and Hetzner Cloud acr
 | `GET /compute?iterations={n}` | Custom iteration count | Variable |
 | `GET /io-heavy/native` | I/O test using provider's native storage | 1-2s |
 | `GET /io-heavy/neutral` | I/O test using Cloudflare R2 (neutral) | 1-2s |
+| `GET /io-heavy/native?bytes={n}` | I/O test with custom payload size (1B-100MB) | Variable |
+| `GET /io-heavy/neutral?bytes={n}` | I/O test with custom payload size (1B-100MB) | Variable |
 
 ### Endpoint Examples
 
-**Health Check:**
+**Health Check (with cold start detection):**
 ```bash
-curl http://localhost:8890/health
-# Response: {"status": "healthy"}
+curl http://localhost:8000/health
+# Response: {"status": "healthy", "cold_start": true, "uptime_seconds": 0.12}
 ```
 
 **Quick - Baseline Latency:**
 ```bash
-curl http://localhost:8890/quick
+curl http://localhost:8000/quick
 # Response: {"message": "ok", "hold_ms": 0}
 ```
 
-**Quick - With Hold (Concurrency Test):**
+**Compute - With Server-Side Timing:**
 ```bash
-curl http://localhost:8890/quick?hold=2000
-# Response: {"message": "ok", "hold_ms": 2000}
-# Takes 2 seconds to respond
+curl http://localhost:8000/compute?iterations=500
+# Response: {"hash": "b4e8c3d...", "iterations": 500, "elapsed_seconds": 0.0123}
 ```
 
-**Compute - Default Iterations:**
+**I/O Heavy - Default 1KB:**
 ```bash
-curl http://localhost:8890/compute
-# Response: {"hash": "a3f7b2c...", "iterations": 100000}
+curl http://localhost:8000/io-heavy/neutral
+# Response: {"operation": "read_write", "bytes": 1024, "storage": "neutral", "write_ms": 45.2, "read_ms": 12.1, "total_ms": 57.3}
 ```
 
-**Compute - Custom Iterations:**
+**I/O Heavy - Custom Payload Sizes:**
 ```bash
-curl http://localhost:8890/compute?iterations=500
-# Response: {"hash": "b4e8c3d...", "iterations": 500}
+curl http://localhost:8000/io-heavy/neutral?bytes=1048576      # 1MB
+curl http://localhost:8000/io-heavy/neutral?bytes=10485760     # 10MB
+curl http://localhost:8000/io-heavy/neutral?bytes=104857600    # 100MB (max)
 ```
 
 ## Tech Stack
@@ -60,6 +62,7 @@ curl http://localhost:8890/compute?iterations=500
 - FastAPI
 - Docker
 - K6 (load testing)
+- aioboto3 (S3-compatible storage - Cloudflare R2)
 
 ## Getting Started
 
@@ -84,137 +87,96 @@ source venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-4. **Create .env file (optional):**
+4. **Create .env file:**
 ```bash
 cp .env.example .env
-# Edit .env to customize COMPUTE_ITERATIONS
+# Edit .env to configure storage backends and R2 credentials
 ```
 
 5. **Run the application:**
 ```bash
-uvicorn app.main:app --reload --port 8890
+uvicorn app.main:app --reload --port 8000
 ```
 
-API available at: `http://localhost:8890`
-API docs (Swagger): `http://localhost:8890/docs`
+API available at: `http://localhost:8000`
+API docs (Swagger): `http://localhost:8000/docs`
 
 ### Running with Docker
 
-**Using Docker Compose (recommended):**
 ```bash
 docker-compose up --build
-```
-
-**Using Docker directly:**
-```bash
-# Build image
-docker build -t cloud-benchmark .
-
-# Run container
-docker run -p 8000:8000 -e COMPUTE_ITERATIONS=100000 cloud-benchmark
 ```
 
 API available at: `http://localhost:8000`
 
 ## Testing
 
-The project includes comprehensive test coverage with **49 tests** covering all endpoints and functionality.
+**49 tests** covering all endpoints and services.
 
-**Run all tests:**
-```bash
-pytest tests/
-```
-
-**Run with verbose output:**
 ```bash
 pytest tests/ -v
 ```
 
-**Run specific test file:**
-```bash
-pytest tests/test_health.py          # Health endpoint (2 tests)
-pytest tests/test_quick.py           # Quick endpoint (7 tests)
-pytest tests/test_compute.py         # Compute endpoint (9 tests)
-pytest tests/test_io_heavy.py        # I/O heavy endpoints (10 tests)
-pytest tests/test_integration.py    # Integration tests (9 tests)
-```
-
-**Test categories:**
-- **Unit tests**: Individual endpoint and service tests
-- **Integration tests**: Full workflow and concurrent request tests
-- **Data integrity tests**: Verify storage operations work correctly
-
 ## Configuration
 
-Environment variables (create `.env` file):
+Environment variables (`.env` file):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `COMPUTE_ITERATIONS` | Number of SHA-256 iterations for /compute | 100000 |
-| `STORAGE_BACKEND_NATIVE` | Storage backend for /io-heavy/native | mock |
-| `STORAGE_BACKEND_NEUTRAL` | Storage backend for /io-heavy/neutral | mock |
+| `COMPUTE_ITERATIONS` | SHA-256 iterations for /compute | 100000 |
+| `STORAGE_BACKEND_NATIVE` | Backend for /io-heavy/native | mock |
+| `STORAGE_BACKEND_NEUTRAL` | Backend for /io-heavy/neutral | mock |
+| `R2_ENDPOINT_URL` | Cloudflare R2 endpoint URL | |
+| `R2_ACCESS_KEY_ID` | R2 access key | |
+| `R2_SECRET_ACCESS_KEY` | R2 secret key | |
+| `R2_BUCKET_NAME` | R2 bucket name | |
 
-## Project Structure
+## Storage Backends
 
-```
-cloud-provider-benchmark/
-├── app/
-│   ├── main.py                      # FastAPI app, router registration
-│   ├── config.py                    # Pydantic settings (env vars)
-│   ├── routers/                     # API endpoints
-│   │   ├── health.py                # GET /health
-│   │   ├── quick.py                 # GET /quick?hold={ms}
-│   │   ├── compute.py               # GET /compute?iterations={n}
-│   │   └── io_heavy.py              # GET /io-heavy/native & /neutral
-│   └── services/                    # Business logic
-│       ├── compute_service.py       # SHA-256 iterative hashing
-│       ├── storage_service.py       # Factory for storage backends
-│       └── storage_backends/        # Pluggable storage system
-│           ├── base.py              # StorageBackend ABC
-│           ├── mock_backend.py      # In-memory (singleton pattern)
-│           └── README.md            # Documentation for adding backends
-├── tests/
-│   ├── conftest.py                  # Pytest fixtures + cleanup
-│   ├── test_health.py               # 2 tests
-│   ├── test_quick.py                # 7 tests
-│   ├── test_compute.py              # 9 tests
-│   ├── test_io_heavy.py             # 10 tests (incl. data integrity)
-│   ├── test_integration.py          # 9 tests (concurrent, full workflow)
-│   └── test_services/               # Service layer tests
-│       ├── test_compute_service.py  # 5 tests
-│       └── test_storage_service.py  # 7 tests
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── requirements-dev.txt
-├── .env.example
-└── README.md
+| Backend | Type | Usage |
+|---------|------|-------|
+| `mock` | In-memory | Development/testing |
+| `r2` | Cloudflare R2 | Neutral cross-provider comparison |
+| `s3` | AWS S3 | AWS native (planned) |
+| `azure_blob` | Azure Blob | Azure native (planned) |
+| `gcs` | Google Cloud Storage | GCP native (planned) |
+
+## K6 Load Test Scenarios
+
+| Scenario | Purpose |
+|----------|---------|
+| `scenario-low-traffic.js` | Idle cost, cold start detection (2 req/min) |
+| `scenario-high-traffic.js` | Latency, auto-scaling (ramp to 500 VUs) |
+| `scenario-heavy-compute.js` | CPU limits, timeout handling |
+| `scenario-mixed.js` | Realistic weighted workload distribution |
+| `scenario-cold-start.js` | Cold start latency measurement |
+
+### Running K6 Tests
+
+```bash
+# Quick test against Hetzner
+k6/scripts/hetzner/hetzner-quick.bat mixed
+
+# Full benchmark (all 5 scenarios)
+k6/scripts/hetzner/hetzner-full-benchmark.bat
 ```
 
-## Architecture Decisions
+## Metrics Collected
 
-### Async vs Sync Endpoints
-- **Sync**: `/compute` (CPU-bound work doesn't benefit from async)
-- **Async**: `/quick`, `/io-heavy/*` (I/O-bound operations)
+**Quantitative (per scenario):**
+- Latency: avg, min, max, med, p50, p90, p95, p99
+- TTFB (Time To First Byte): full percentile breakdown
+- Throughput: requests/second
+- Error rate, timeout rate
+- Connection timing: connecting, TLS, sending, receiving
+- Cold start detection and latency
+- Server-side processing time (elapsed_seconds)
+- I/O timing: write_ms, read_ms, total_ms (with variable payload sizes: 1KB, 1MB, 10MB, 100MB)
 
-### Storage Backend Pattern
-- Abstract base class `StorageBackend` with `read()` and `write()` methods
-- Pluggable backends in separate files under `storage_backends/`
-- MockStorageBackend uses singleton pattern (ClassVar) for test verification
-- Future: S3, Azure Blob, GCS, Hetzner, R2 backends
-
-### Test Isolation
-- `conftest.py` has `autouse=True` fixture that clears MockStorageBackend after each test
-- Ensures no data leakage between tests
-
-## Test Scenarios
-
-1. **Low Traffic** - 100-1000 req/day, comparing idle resource costs
-2. **High Traffic** - 1000+ req/sec, latency and auto-scaling testing
-3. **Concurrency** - simultaneous long-held connections
-4. **Heavy Processing** - CPU-intensive tasks, cold start analysis
-5. **I/O Native** - performance with integrated storage services
-6. **I/O Neutral** - performance with neutral third-party storage
+**Qualitative:**
+- Deployment time
+- Configuration complexity (1-5)
+- Developer experience
 
 ## Author
 
