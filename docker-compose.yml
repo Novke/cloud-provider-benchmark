@@ -3,8 +3,8 @@ services:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      - COMPUTE_ITERATIONS=100000
+    env_file:
+      - .env
     cpus: 1.0
     mem_limit: 512m
     mem_reservation: 256m
