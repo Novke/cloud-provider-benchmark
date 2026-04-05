@@ -8,7 +8,7 @@ echo Duration: ~1-2 min per scenario
 echo.
 
 cd /d "%~dp0..\..\.."
-for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd"') do set DATEDIR=%%i
+for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd_HH-mm"') do set DATEDIR=%%i
 if not exist k6\results\local\%DATEDIR% mkdir k6\results\local\%DATEDIR%
 
 set K6_META=-e PROVIDER=local -e ARCH=local -e K6_RESULTS_DIR=k6/results/local/%DATEDIR%

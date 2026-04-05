@@ -3,7 +3,7 @@ REM /compute endpoint - default load (100000 iterations, ~2-3s)
 REM Standard benchmark for CPU performance comparison
 
 cd /d "%~dp0..\..\.."
-for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd"') do set DATEDIR=%%i
+for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd_HH-mm"') do set DATEDIR=%%i
 if not exist k6\results\local\%DATEDIR% mkdir k6\results\local\%DATEDIR%
 
 echo === Compute Default (ITERATIONS=100000) ===

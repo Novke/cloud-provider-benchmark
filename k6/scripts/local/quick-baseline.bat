@@ -3,7 +3,7 @@ REM /quick endpoint - baseline (no hold)
 REM Tests raw latency and max throughput
 
 cd /d "%~dp0..\..\.."
-for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd"') do set DATEDIR=%%i
+for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd_HH-mm"') do set DATEDIR=%%i
 if not exist k6\results\local\%DATEDIR% mkdir k6\results\local\%DATEDIR%
 
 echo === Quick Baseline (HOLD_MS=0) ===

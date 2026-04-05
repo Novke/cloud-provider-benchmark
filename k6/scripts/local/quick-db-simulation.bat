@@ -3,7 +3,7 @@ REM /quick endpoint - simulates DB query delay (500ms hold)
 REM Tests how the system handles realistic processing delays
 
 cd /d "%~dp0..\..\.."
-for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd"') do set DATEDIR=%%i
+for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd_HH-mm"') do set DATEDIR=%%i
 if not exist k6\results\local\%DATEDIR% mkdir k6\results\local\%DATEDIR%
 
 echo === Quick DB Simulation (HOLD_MS=500) ===
