@@ -25,7 +25,7 @@ if "%~1"=="" (
 set SCENARIO=%~1
 
 cd /d "%~dp0..\..\.."
-for /f "tokens=2-4 delims=/ " %%a in ('date /t') do set DATEDIR=%%c-%%a-%%b
+for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd"') do set DATEDIR=%%i
 if not exist k6\results\hetzner\%DATEDIR% mkdir k6\results\hetzner\%DATEDIR%
 
 echo === Hetzner Quick: %SCENARIO% ===
@@ -40,4 +40,4 @@ if errorlevel 1 (
     exit /b 1
 )
 
-k6 run -e BASE_URL=%HETZNER_URL% -e PROFILE=local -e K6_RESULTS_DIR=k6/results/hetzner/%DATEDIR% k6/scenario-%SCENARIO%.js
+k6 run -e BASE_URL=%HETZNER_URL% -e PROFILE=local -e PROVIDER=hetzner -e ARCH=caas -e REGION=eu-falkenstein -e K6_RESULTS_DIR=k6/results/hetzner/%DATEDIR% k6/scenario-%SCENARIO%.js
