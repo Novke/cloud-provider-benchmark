@@ -8,7 +8,7 @@ if "%PROVIDER_URL%"=="" (
 )
 if "%~1"=="" (
     echo Usage: Called via provider script with scenario argument
-    echo Scenarios: high-traffic, heavy-compute, mixed, low-traffic
+    echo Scenarios: high-traffic, heavy-compute, mixed, low-traffic, cold-start
     exit /b 1
 )
 
