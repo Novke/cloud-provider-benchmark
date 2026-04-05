@@ -40,6 +40,10 @@ import {
     thresholds,
     getConfigSummary,
     getResultPaths,
+    standardTrendStats,
+    getRunMetadata,
+    extractTrendStats,
+    extractConnectionStats,
 } from './config.js';
 
 // Per-endpoint metrics
@@ -81,6 +85,7 @@ if (profile.includeIO) {
 }
 
 export const options = {
+    summaryTrendStats: standardTrendStats,
     stages: stages,
     thresholds: scenarioThresholds,
 };
@@ -156,31 +161,26 @@ export function handleSummary(data) {
 
     // Build endpoint stats - only include IO if present
     const endpointStats = {
-        quick: extractPercentiles(data.metrics.latency_quick),
-        health: extractPercentiles(data.metrics.latency_health),
-        compute: extractPercentiles(data.metrics.latency_compute),
+        quick: extractTrendStats(data.metrics.latency_quick),
+        health: extractTrendStats(data.metrics.latency_health),
+        compute: extractTrendStats(data.metrics.latency_compute),
     };
 
     if (config.includeIO) {
-        endpointStats.io_native = extractPercentiles(data.metrics.latency_io_native);
-        endpointStats.io_neutral = extractPercentiles(data.metrics.latency_io_neutral);
+        endpointStats.io_native = extractTrendStats(data.metrics.latency_io_native);
+        endpointStats.io_neutral = extractTrendStats(data.metrics.latency_io_neutral);
     }
 
     const summary = {
-        timestamp: new Date().toISOString(),
+        run_metadata: getRunMetadata(data.state?.testRunDurationMs),
+        scenario: 'mixed',
         config: config,
         metrics: {
             total_requests: data.metrics.total_requests?.values?.count || 0,
             throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
             error_rate: data.metrics.errors?.values?.rate || 0,
-            ttfb: {
-                avg: data.metrics.http_req_waiting?.values?.avg,
-                min: data.metrics.http_req_waiting?.values?.min,
-                max: data.metrics.http_req_waiting?.values?.max,
-                p50: data.metrics.http_req_waiting?.values?.['p(50)'],
-                p95: data.metrics.http_req_waiting?.values?.['p(95)'],
-                p99: data.metrics.http_req_waiting?.values?.['p(99)'],
-            },
+            ttfb: extractTrendStats(data.metrics.http_req_waiting),
+            connection: extractConnectionStats(data),
             endpoints: endpointStats,
         },
     };
@@ -189,20 +189,6 @@ export function handleSummary(data) {
         'stdout': textSummary(data, { indent: ' ', enableColors: true }),
         [paths.summary]: JSON.stringify(data, null, 2),
         [paths.analysis]: JSON.stringify(summary, null, 2),
-    };
-}
-
-function extractPercentiles(metric) {
-    if (!metric || !metric.values) return null;
-    return {
-        count: metric.values.count,
-        avg: metric.values.avg,
-        min: metric.values.min,
-        max: metric.values.max,
-        p50: metric.values['p(50)'],
-        p90: metric.values['p(90)'],
-        p95: metric.values['p(95)'],
-        p99: metric.values['p(99)'],
     };
 }
 

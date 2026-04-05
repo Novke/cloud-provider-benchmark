@@ -10,6 +10,10 @@
  *   HOLD_MS            - /quick endpoint hold param (default: 0)
  *   COMPUTE_ITERATIONS - /compute iterations (default: 100000)
  *   VUS                - Override max virtual users
+ *   K6_RESULTS_DIR     - Output directory for results
+ *   PROVIDER           - Provider name for run metadata (e.g. 'hetzner')
+ *   ARCH               - Architecture for run metadata (e.g. 'caas')
+ *   RUN_NUMBER         - Run number for run metadata (e.g. '1')
  */
 
 import http from 'k6/http';
@@ -252,6 +256,60 @@ export function getResultPaths(scenarioName) {
     return {
         summary: `${RESULTS_DIR}/${scenarioName}-summary.json`,
         analysis: `${RESULTS_DIR}/${scenarioName}-analysis.json`,
+    };
+}
+
+/**
+ * Standard summaryTrendStats for all scenarios.
+ * Includes p50 and p99 which k6 does not include by default.
+ */
+export const standardTrendStats = ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'];
+
+/**
+ * Build run metadata from environment variables.
+ * Pass via: -e PROVIDER=hetzner -e ARCH=caas -e RUN_NUMBER=1
+ */
+export function getRunMetadata(testDurationMs) {
+    return {
+        provider: __ENV.PROVIDER || 'unknown',
+        architecture: __ENV.ARCH || 'unknown',
+        run_number: parseInt(__ENV.RUN_NUMBER || '0', 10),
+        region: __ENV.REGION || 'unknown',
+        timestamp: new Date().toISOString(),
+        k6_version: '0.49.0',
+        test_duration_seconds: Math.round((testDurationMs || 0) / 1000),
+        base_url: BASE_URL,
+        profile: profileName,
+    };
+}
+
+/**
+ * Extract full percentile stats from a k6 Trend metric.
+ * Works with both built-in and custom Trend metrics.
+ */
+export function extractTrendStats(metric) {
+    if (!metric || !metric.values) return null;
+    return {
+        avg: metric.values.avg,
+        min: metric.values.min,
+        med: metric.values.med,
+        max: metric.values.max,
+        p50: metric.values['p(50)'],
+        p90: metric.values['p(90)'],
+        p95: metric.values['p(95)'],
+        p99: metric.values['p(99)'],
+    };
+}
+
+/**
+ * Extract connection timing breakdown from k6 data.
+ */
+export function extractConnectionStats(data) {
+    return {
+        connecting: extractTrendStats(data.metrics.http_req_connecting),
+        tls_handshaking: extractTrendStats(data.metrics.http_req_tls_handshaking),
+        sending: extractTrendStats(data.metrics.http_req_sending),
+        receiving: extractTrendStats(data.metrics.http_req_receiving),
     };
 }
 

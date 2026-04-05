@@ -36,6 +36,10 @@ import {
     HOLD_MS,
     getConfigSummary,
     getResultPaths,
+    standardTrendStats,
+    getRunMetadata,
+    extractTrendStats,
+    extractConnectionStats,
 } from './config.js';
 
 // Custom metrics
@@ -72,6 +76,7 @@ if (HOLD_MS > 0) {
 }
 
 export const options = {
+    summaryTrendStats: standardTrendStats,
     stages: stages,
     thresholds: {
         ...adjustedQuickThresholds,
@@ -123,28 +128,16 @@ export function handleSummary(data) {
     const config = getConfigSummary();
     const paths = getResultPaths('high-traffic');
     const summary = {
-        timestamp: new Date().toISOString(),
+        run_metadata: getRunMetadata(data.state?.testRunDurationMs),
+        scenario: 'high-traffic',
         config: config,
         metrics: {
             total_requests: data.metrics.http_reqs?.values?.count || 0,
             throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
             error_rate: data.metrics.errors?.values?.rate || 0,
-            latency: {
-                avg: data.metrics.quick_latency?.values?.avg,
-                min: data.metrics.quick_latency?.values?.min,
-                max: data.metrics.quick_latency?.values?.max,
-                p50: data.metrics.quick_latency?.values?.['p(50)'],
-                p95: data.metrics.quick_latency?.values?.['p(95)'],
-                p99: data.metrics.quick_latency?.values?.['p(99)'],
-            },
-            ttfb: {
-                avg: data.metrics.http_req_waiting?.values?.avg,
-                min: data.metrics.http_req_waiting?.values?.min,
-                max: data.metrics.http_req_waiting?.values?.max,
-                p50: data.metrics.http_req_waiting?.values?.['p(50)'],
-                p95: data.metrics.http_req_waiting?.values?.['p(95)'],
-                p99: data.metrics.http_req_waiting?.values?.['p(99)'],
-            },
+            latency: extractTrendStats(data.metrics.quick_latency),
+            ttfb: extractTrendStats(data.metrics.http_req_waiting),
+            connection: extractConnectionStats(data),
         },
     };
 

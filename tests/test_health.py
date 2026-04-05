@@ -15,4 +15,9 @@ async def test_health_returns_200(client: AsyncClient) -> None:
 async def test_health_response_body(client: AsyncClient) -> None:
     """Test that health endpoint returns correct response body."""
     response = await client.get("/health")
-    assert response.json() == {"status": "healthy"}
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "cold_start" in data
+    assert "uptime_seconds" in data
+    assert isinstance(data["cold_start"], bool)
+    assert isinstance(data["uptime_seconds"], (int, float))

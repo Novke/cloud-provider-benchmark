@@ -26,6 +26,9 @@ async def test_io_heavy_native_response_structure(client: AsyncClient) -> None:
     assert data["operation"] == "read_write"
     assert data["bytes"] == 1024
     assert data["storage"] == "native"
+    assert "write_ms" in data
+    assert "read_ms" in data
+    assert "total_ms" in data
 
 
 @pytest.mark.asyncio
@@ -47,6 +50,9 @@ async def test_io_heavy_neutral_response_structure(client: AsyncClient) -> None:
     assert data["operation"] == "read_write"
     assert data["bytes"] == 1024
     assert data["storage"] == "neutral"
+    assert "write_ms" in data
+    assert "read_ms" in data
+    assert "total_ms" in data
 
 
 @pytest.mark.asyncio

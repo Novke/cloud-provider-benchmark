@@ -1,14 +1,21 @@
 """FastAPI application initialization."""
 
+import time
+
 from fastapi import FastAPI
 
 from app.routers import health, quick, compute, io_heavy
+
+APP_START_TIME = time.time()
 
 app = FastAPI(
     title="Cloud Benchmark API",
     version="0.1.0",
     description="Benchmarking application for comparing cloud provider performance",
 )
+
+app.state.start_time = APP_START_TIME
+app.state.first_request_received = False
 
 app.include_router(health.router)
 app.include_router(quick.router)

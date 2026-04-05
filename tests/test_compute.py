@@ -21,8 +21,11 @@ async def test_compute_response_structure(client: AsyncClient) -> None:
 
     assert "hash" in data
     assert "iterations" in data
+    assert "elapsed_seconds" in data
     assert isinstance(data["hash"], str)
     assert isinstance(data["iterations"], int)
+    assert isinstance(data["elapsed_seconds"], (int, float))
+    assert data["elapsed_seconds"] >= 0
 
 
 @pytest.mark.asyncio

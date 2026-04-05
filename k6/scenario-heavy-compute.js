@@ -34,6 +34,10 @@ import {
     COMPUTE_ITERATIONS,
     getConfigSummary,
     getResultPaths,
+    standardTrendStats,
+    getRunMetadata,
+    extractTrendStats,
+    extractConnectionStats,
 } from './config.js';
 
 // Custom metrics
@@ -96,6 +100,7 @@ const estimatedDuration = Math.ceil((COMPUTE_ITERATIONS / 100000) * 3000);
 const timeoutThreshold = Math.max(10000, estimatedDuration * 3); // At least 10s, up to 3x estimated
 
 export const options = {
+    summaryTrendStats: standardTrendStats,
     scenarios: scenarios,
     thresholds: {
         ...computeThresholds,
@@ -166,7 +171,8 @@ export function handleSummary(data) {
     const config = getConfigSummary();
     const paths = getResultPaths('heavy-compute');
     const summary = {
-        timestamp: new Date().toISOString(),
+        run_metadata: getRunMetadata(data.state?.testRunDurationMs),
+        scenario: 'heavy-compute',
         config: config,
         estimatedDurationMs: estimatedDuration,
         timeoutThresholdMs: timeoutThreshold,
@@ -175,22 +181,9 @@ export function handleSummary(data) {
             throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
             error_rate: data.metrics.errors?.values?.rate || 0,
             timeout_rate: data.metrics.timeouts?.values?.rate || 0,
-            latency: {
-                avg: data.metrics.compute_latency?.values?.avg,
-                min: data.metrics.compute_latency?.values?.min,
-                max: data.metrics.compute_latency?.values?.max,
-                p50: data.metrics.compute_latency?.values?.['p(50)'],
-                p95: data.metrics.compute_latency?.values?.['p(95)'],
-                p99: data.metrics.compute_latency?.values?.['p(99)'],
-            },
-            ttfb: {
-                avg: data.metrics.http_req_waiting?.values?.avg,
-                min: data.metrics.http_req_waiting?.values?.min,
-                max: data.metrics.http_req_waiting?.values?.max,
-                p50: data.metrics.http_req_waiting?.values?.['p(50)'],
-                p95: data.metrics.http_req_waiting?.values?.['p(95)'],
-                p99: data.metrics.http_req_waiting?.values?.['p(99)'],
-            },
+            latency: extractTrendStats(data.metrics.compute_latency),
+            ttfb: extractTrendStats(data.metrics.http_req_waiting),
+            connection: extractConnectionStats(data),
         },
     };
 

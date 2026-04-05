@@ -18,7 +18,7 @@ def compute(
         ge=1,
         description="Number of SHA-256 iterations. Uses COMPUTE_ITERATIONS from env if not provided."
     )
-) -> dict[str, str | int]:
+) -> dict:
     """
     CPU-intensive compute endpoint using iterative SHA-256 hashing.
 
@@ -36,9 +36,8 @@ def compute(
     hash_result = compute_hash(iteration_count)
     elapsed_time = time.time() - start_time
 
-    print(f"Compute completed: iterations={iteration_count}, time={elapsed_time:.4f}s")
-
     return {
         "hash": hash_result,
         "iterations": iteration_count,
+        "elapsed_seconds": round(elapsed_time, 4),
     }
