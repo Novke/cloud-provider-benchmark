@@ -17,10 +17,11 @@
  *   k6 run --out json=results/low-traffic.json k6/scenario-low-traffic.js
  */
 
-import { sleep } from 'k6';
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { Trend, Counter, Rate } from 'k6/metrics';
 import {
     BASE_URL,
-    makeRequest,
     endpoints,
     thresholds,
     profile,
@@ -31,6 +32,25 @@ import {
     extractTrendStats,
     extractConnectionStats,
 } from './config.js';
+
+// Per-endpoint metrics
+const quickLatency = new Trend('latency_quick');
+const healthLatency = new Trend('latency_health');
+const computeLatency = new Trend('latency_compute');
+const ioNativeLatency = new Trend('latency_io_native');
+const ioNeutralLatency = new Trend('latency_io_neutral');
+
+const errorRate = new Rate('errors');
+const requestCounter = new Counter('total_requests');
+
+// Endpoint-to-metric mapping
+const endpointMetrics = {
+    [endpoints.health]: { metric: healthLatency, name: 'health' },
+    [endpoints.quick]: { metric: quickLatency, name: 'quick' },
+    [endpoints.compute]: { metric: computeLatency, name: 'compute' },
+    [endpoints.ioNative]: { metric: ioNativeLatency, name: 'io_native' },
+    [endpoints.ioNeutral]: { metric: ioNeutralLatency, name: 'io_neutral' },
+};
 
 // Build endpoint list based on profile
 const endpointList = profile.includeIO
@@ -83,9 +103,25 @@ export default function () {
     const endpoint = endpointList[endpointIndex % endpointList.length];
     endpointIndex++;
 
-    const startTime = Date.now();
-    const response = makeRequest(endpoint);
-    const duration = Date.now() - startTime;
+    const { metric, name } = endpointMetrics[endpoint];
+    const url = `${BASE_URL}${endpoint}`;
+    const timeout = name === 'compute' ? '30s' : '10s';
+
+    const start = Date.now();
+    const response = http.get(url, {
+        timeout: timeout,
+        tags: { endpoint: name },
+    });
+    const duration = Date.now() - start;
+
+    // Record per-endpoint latency
+    metric.add(duration);
+    requestCounter.add(1);
+
+    const success = check(response, {
+        'status is 200': (r) => r.status === 200,
+    });
+    errorRate.add(!success);
 
     // Log for cold start analysis
     console.log(`${new Date().toISOString()} | ${endpoint} | ${response.status} | ${duration}ms`);
@@ -94,18 +130,31 @@ export default function () {
 export function handleSummary(data) {
     const config = getConfigSummary();
     const paths = getResultPaths('low-traffic');
+    // Build endpoint stats
+    const endpointStats = {
+        quick: extractTrendStats(data.metrics.latency_quick),
+        health: extractTrendStats(data.metrics.latency_health),
+        compute: extractTrendStats(data.metrics.latency_compute),
+    };
+
+    if (config.includeIO) {
+        endpointStats.io_native = extractTrendStats(data.metrics.latency_io_native);
+        endpointStats.io_neutral = extractTrendStats(data.metrics.latency_io_neutral);
+    }
+
     const summary = {
         run_metadata: getRunMetadata(data.state?.testRunDurationMs),
         scenario: 'low-traffic',
         config: config,
         endpointsTested: endpointList,
         metrics: {
-            total_requests: data.metrics.http_reqs?.values?.count || 0,
+            total_requests: data.metrics.total_requests?.values?.count || 0,
             throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
-            error_rate: data.metrics.http_req_failed?.values?.rate || 0,
+            error_rate: data.metrics.errors?.values?.rate || 0,
             latency: extractTrendStats(data.metrics.http_req_duration),
             ttfb: extractTrendStats(data.metrics.http_req_waiting),
             connection: extractConnectionStats(data),
+            endpoints: endpointStats,
         },
     };
 
