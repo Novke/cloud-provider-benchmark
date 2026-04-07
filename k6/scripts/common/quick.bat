@@ -25,7 +25,7 @@ echo Profile: local (short durations)
 echo Results: %RESULTS_DIR%/
 echo.
 
-curl -sf %PROVIDER_URL%/health >nul 2>&1
+curl -sf --max-time 10 %PROVIDER_URL%/health >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Server not responding at %PROVIDER_URL%/health
     exit /b 1

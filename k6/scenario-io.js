@@ -44,6 +44,7 @@ if (!IO_BACKEND || (IO_BACKEND !== 'native' && IO_BACKEND !== 'neutral')) {
 }
 
 const IO_BYTES = parseInt(__ENV.IO_BYTES || '1024', 10);
+const IO_MAX_VUS = parseInt(__ENV.IO_VUS || '50', 10);
 
 // Custom metrics
 const ioLatency = new Trend('io_latency');
@@ -56,12 +57,12 @@ const requestCounter = new Counter('total_requests');
 const endpoint = IO_BACKEND === 'native' ? '/io-heavy/native' : '/io-heavy/neutral';
 const ioUrl = `${BASE_URL}${endpoint}?bytes=${IO_BYTES}`;
 
-// Build stages based on profile
+// Build stages - scaled to IO_MAX_VUS (default 50, not 500)
 const stages = [
-    { duration: profile.durations.warmup, target: profile.vus.warmup },
-    { duration: profile.durations.rampUp, target: profile.vus.moderate },
-    { duration: profile.durations.sustain, target: profile.vus.moderate },
-    { duration: profile.durations.peak, target: profile.vus.peak },
+    { duration: profile.durations.warmup, target: Math.ceil(IO_MAX_VUS * 0.2) },
+    { duration: profile.durations.rampUp, target: Math.ceil(IO_MAX_VUS * 0.5) },
+    { duration: profile.durations.sustain, target: Math.ceil(IO_MAX_VUS * 0.5) },
+    { duration: profile.durations.peak, target: IO_MAX_VUS },
     { duration: profile.durations.cooldown, target: 0 },
 ];
 
