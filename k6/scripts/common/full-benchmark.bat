@@ -1,5 +1,5 @@
 @echo off
-REM Common: Full benchmark - all 5 scenarios (full cloud durations)
+REM Common: Full benchmark - all 7 scenarios (full cloud durations)
 REM Requires: PROVIDER_URL, PROVIDER, ARCH, REGION set by caller
 
 if "%PROVIDER_URL%"=="" (
@@ -27,23 +27,31 @@ echo.
 
 set K6_META=-e BASE_URL=%PROVIDER_URL% -e PROVIDER=%PROVIDER% -e ARCH=%ARCH% -e REGION=%REGION% -e K6_RESULTS_DIR=%RESULTS_DIR%
 
-echo [1/5] High-traffic scenario...
+echo [1/7] High-traffic scenario...
 k6 run %K6_META% k6/scenario-high-traffic.js
 echo.
 
-echo [2/5] Heavy-compute scenario...
+echo [2/7] Heavy-compute scenario...
 k6 run %K6_META% k6/scenario-heavy-compute.js
 echo.
 
-echo [3/5] Mixed scenario...
+echo [3/7] Mixed scenario...
 k6 run %K6_META% k6/scenario-mixed.js
 echo.
 
-echo [4/5] Low-traffic scenario...
+echo [4/7] Low-traffic scenario...
 k6 run %K6_META% k6/scenario-low-traffic.js
 echo.
 
-echo [5/5] Cold-start scenario...
+echo [5/7] IO native scenario...
+k6 run %K6_META% -e IO_BACKEND=native k6/scenario-io.js
+echo.
+
+echo [6/7] IO neutral scenario...
+k6 run %K6_META% -e IO_BACKEND=neutral k6/scenario-io.js
+echo.
+
+echo [7/7] Cold-start scenario...
 k6 run %K6_META% k6/scenario-cold-start.js
 echo.
 
