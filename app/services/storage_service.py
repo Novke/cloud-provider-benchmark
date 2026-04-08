@@ -1,16 +1,14 @@
-"""Storage service factory and utilities.
-
-This module provides a factory function for creating storage backend instances.
-Backend implementations are located in the storage_backends package.
-
-Future backends to be implemented:
-- S3Backend (AWS S3)
-- AzureBlobBackend (Azure Blob Storage)
-- GCSBackend (Google Cloud Storage)
-"""
+"""Storage service factory and utilities."""
 
 from app.config import settings
-from .storage_backends import StorageBackend, MockStorageBackend, R2Backend
+from .storage_backends import (
+    StorageBackend,
+    MockStorageBackend,
+    S3CompatibleBackend,
+    R2Backend,
+    AzureBlobBackend,
+    GCSBackend,
+)
 
 
 def get_storage_backend(backend_type: str) -> StorageBackend:
@@ -19,11 +17,10 @@ def get_storage_backend(backend_type: str) -> StorageBackend:
 
     Args:
         backend_type: Type of backend to create.
-            Supported: "mock", "r2"
-            Future: "s3", "azure_blob", "gcs"
+            Supported: "mock", "r2", "s3", "azure_blob", "gcs"
 
     Returns:
-        StorageBackend: Instance of the requested backend.
+        StorageBackend instance.
 
     Raises:
         ValueError: If backend_type is not supported.
@@ -39,7 +36,36 @@ def get_storage_backend(backend_type: str) -> StorageBackend:
             bucket_name=settings.r2_bucket_name,
         )
 
-    supported = "mock, r2"
+    if backend_type == "s3":
+        return S3CompatibleBackend(
+            bucket_name=settings.s3_bucket_name,
+            access_key_id=settings.s3_access_key_id,
+            secret_access_key=settings.s3_secret_access_key,
+            region_name=settings.s3_region,
+        )
+
+    if backend_type == "azure_blob":
+        return AzureBlobBackend(
+            connection_string=settings.azure_blob_connection_string,
+            container_name=settings.azure_blob_container_name,
+        )
+
+    if backend_type == "gcs":
+        return GCSBackend(
+            bucket_name=settings.gcs_bucket_name,
+            credentials_path=settings.gcs_credentials_path or None,
+        )
+
+    if backend_type == "hetzner_storage":
+        return S3CompatibleBackend(
+            bucket_name=settings.hetzner_storage_bucket_name,
+            access_key_id=settings.hetzner_storage_access_key_id,
+            secret_access_key=settings.hetzner_storage_secret_access_key,
+            region_name=settings.hetzner_storage_region,
+            endpoint_url=settings.hetzner_storage_endpoint_url,
+        )
+
+    supported = "mock, r2, s3, azure_blob, gcs, hetzner_storage"
     raise ValueError(
         f"Unsupported storage backend type: '{backend_type}'. "
         f"Supported types: {supported}"
