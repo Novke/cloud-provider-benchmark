@@ -16,7 +16,7 @@ set SCENARIO=%~1
 
 cd /d "%~dp0..\..\.."
 for /f %%i in ('powershell -Command "Get-Date -Format yyyy-MM-dd_HH-mm"') do set DATEDIR=%%i
-set RESULTS_DIR=k6\results\%PROVIDER%\%DATEDIR%
+set RESULTS_DIR=k6\results\%PROVIDER%\%SCENARIO%\%DATEDIR%
 if not exist %RESULTS_DIR% mkdir %RESULTS_DIR%
 
 echo === %PROVIDER% Quick: %SCENARIO% ===

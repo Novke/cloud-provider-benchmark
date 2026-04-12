@@ -252,10 +252,10 @@ export const RESULTS_DIR = __ENV.K6_RESULTS_DIR || 'k6/results';
  * @param {string} scenarioName - e.g. 'mixed', 'high-traffic'
  * @returns {object} { summary: path, analysis: path }
  */
-export function getResultPaths(scenarioName) {
+export function getResultPaths(_scenarioName) {
     return {
-        summary: `${RESULTS_DIR}/${scenarioName}-summary.json`,
-        analysis: `${RESULTS_DIR}/${scenarioName}-analysis.json`,
+        summary: `${RESULTS_DIR}/summary.json`,
+        analysis: `${RESULTS_DIR}/analysis.json`,
     };
 }
 
