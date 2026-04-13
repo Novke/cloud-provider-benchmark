@@ -46,16 +46,16 @@ import {
 const errorRate = new Rate('errors');
 const latencyTrend = new Trend('quick_latency');
 
-// Build stages based on profile
+// Build stages based on profile (consistent pattern with all other scenarios)
 const stages = [
     // Warm-up: Gradual ramp
     { duration: profile.durations.warmup, target: profile.vus.warmup },
-    // Scale-up: Ramp to moderate (simulates traffic spike)
+    // Scale-up: Ramp to moderate
     { duration: profile.durations.rampUp, target: profile.vus.moderate },
-    // Peak load: Sustain high VUs
-    { duration: profile.durations.sustain, target: profile.vus.peak },
-    // Scale-down: Gradual decrease
-    { duration: profile.durations.cooldown, target: profile.vus.warmup },
+    // Sustain: Hold at moderate
+    { duration: profile.durations.sustain, target: profile.vus.moderate },
+    // Peak: Spike to max
+    { duration: profile.durations.peak, target: profile.vus.peak },
     // Cool-down
     { duration: profile.durations.cooldown, target: 0 },
 ];
