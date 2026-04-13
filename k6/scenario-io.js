@@ -89,7 +89,7 @@ export function setup() {
     console.log(`Profile: ${config.profile}`);
     console.log(`Backend: ${IO_BACKEND}`);
     console.log(`Payload: ${formatBytes(IO_BYTES)}`);
-    console.log(`Max VUs: ${config.maxVus}`);
+    console.log(`Max VUs: ${IO_MAX_VUS}`);
     console.log(`URL: ${ioUrl}`);
     console.log('============================');
     return { ...config, io_backend: IO_BACKEND, io_bytes: IO_BYTES };
@@ -132,6 +132,7 @@ export function handleSummary(data) {
         scenario: scenarioName,
         config: {
             ...config,
+            maxVus: IO_MAX_VUS,
             io_backend: IO_BACKEND,
             io_bytes: IO_BYTES,
             io_bytes_human: formatBytes(IO_BYTES),
