@@ -28,7 +28,8 @@ jobs:
             cd /srv/backend/cloud-benchmark
 
             if [ ! -d ".git" ]; then
-              git clone https://github.com/${{ github.repository }}.git .
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git
             fi
             git fetch origin
             git reset --hard origin/main
