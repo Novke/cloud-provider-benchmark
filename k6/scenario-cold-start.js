@@ -47,10 +47,12 @@ const errorRate = new Rate('errors');
 
 // Number of warm requests per cycle
 const WARM_REQUESTS = 5;
-// Idle seconds between cycles (for FaaS, this should be > provider's idle timeout)
+// Idle seconds between cycles - set high for FaaS (e.g. 600 = 10 min to trigger real cold start)
+// For IaaS/CaaS this just measures post-idle latency (no real cold start without container restart)
 const IDLE_SECONDS = parseInt(__ENV.IDLE_SECONDS || '30', 10);
-// Number of cold-start measurement cycles
-const CYCLES = parseInt(__ENV.CYCLES || '3', 10);
+// Number of cold-start measurement cycles (default 1 = single shot)
+// For FaaS with multiple cycles: k6 run -e CYCLES=5 -e IDLE_SECONDS=600 k6/scenario-cold-start.js
+const CYCLES = parseInt(__ENV.CYCLES || '1', 10);
 
 // Total duration: CYCLES * (1 first request + WARM_REQUESTS + IDLE_SECONDS wait)
 // Rough estimate: 3 cycles * ~35s = ~105s for local
