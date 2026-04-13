@@ -105,59 +105,40 @@ async def test_io_heavy_endpoints_use_different_storage(client: AsyncClient) -> 
 
 @pytest.mark.asyncio
 async def test_io_heavy_native_data_integrity(client: AsyncClient) -> None:
-    """Test that /io-heavy/native actually writes and reads data from storage."""
-    # Call the endpoint
+    """Test that /io-heavy/native writes and reads back matching data (unique key per request)."""
     response = await client.get("/io-heavy/native")
     assert response.status_code == 200
-
-    # Now directly check if data exists in storage
-    backend = get_storage_backend(settings.storage_backend_native)
-
-    # The endpoint writes to key "benchmark-test-native"
-    stored_data = await backend.read("benchmark-test-native")
-
-    # Verify data was actually written and is 1KB
-    assert stored_data is not None
-    assert len(stored_data) == 1024
-    assert isinstance(stored_data, bytes)
+    data = response.json()
+    # Endpoint writes random data, reads it back, and verifies integrity internally
+    # If integrity check fails, endpoint returns 500
+    assert data["bytes"] == 1024
+    assert data["write_ms"] >= 0
+    assert data["read_ms"] >= 0
 
 
 @pytest.mark.asyncio
 async def test_io_heavy_neutral_data_integrity(client: AsyncClient) -> None:
-    """Test that /io-heavy/neutral actually writes and reads data from storage."""
-    # Call the endpoint
+    """Test that /io-heavy/neutral writes and reads back matching data (unique key per request)."""
     response = await client.get("/io-heavy/neutral")
     assert response.status_code == 200
-
-    # Now directly check if data exists in storage
-    backend = get_storage_backend(settings.storage_backend_neutral)
-
-    # The endpoint writes to key "benchmark-test-neutral"
-    stored_data = await backend.read("benchmark-test-neutral")
-
-    # Verify data was actually written and is 1KB
-    assert stored_data is not None
-    assert len(stored_data) == 1024
-    assert isinstance(stored_data, bytes)
+    data = response.json()
+    assert data["bytes"] == 1024
+    assert data["write_ms"] >= 0
+    assert data["read_ms"] >= 0
 
 
 @pytest.mark.asyncio
-async def test_io_heavy_native_overwrites_data(client: AsyncClient) -> None:
-    """Test that calling /io-heavy/native multiple times overwrites data correctly."""
+async def test_io_heavy_unique_keys_per_request(client: AsyncClient) -> None:
+    """Test that multiple requests create separate storage keys (no contention)."""
     backend = get_storage_backend(settings.storage_backend_native)
 
-    # First call
+    # Two calls should each write to different keys
     response1 = await client.get("/io-heavy/native")
     assert response1.status_code == 200
-    data1 = await backend.read("benchmark-test-native")
-
-    # Second call (should overwrite)
     response2 = await client.get("/io-heavy/native")
     assert response2.status_code == 200
-    data2 = await backend.read("benchmark-test-native")
 
-    # Both should be 1KB but likely different random data
-    assert len(data1) == 1024
-    assert len(data2) == 1024
-    # Data is random, so they will likely be different
-    # (there's a tiny chance they're the same, but extremely unlikely)
+    # MockBackend storage should have 2 separate keys (not 1 overwritten key)
+    from app.services.storage_backends.mock_backend import MockStorageBackend
+    native_keys = [k for k in MockStorageBackend._shared_storage if k.startswith("benchmark-native-")]
+    assert len(native_keys) >= 2

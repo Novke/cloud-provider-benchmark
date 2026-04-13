@@ -2,6 +2,7 @@
 
 import os
 import time
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -19,7 +20,7 @@ async def _run_io_benchmark(backend_type: str, storage_label: str, size_bytes: i
     """Run write/read benchmark and return timing metrics."""
     backend = get_storage_backend(backend_type)
     data = os.urandom(size_bytes)
-    key = f"benchmark-test-{storage_label}"
+    key = f"benchmark-{storage_label}-{uuid.uuid4().hex[:8]}"
 
     t0 = time.time()
     await backend.write(key, data)
