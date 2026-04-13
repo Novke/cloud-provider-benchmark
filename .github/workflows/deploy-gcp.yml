@@ -29,10 +29,9 @@ jobs:
 
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }}.git .
-            else
-              git fetch origin
-              git reset --hard origin/main
             fi
+            git fetch origin
+            git reset --hard origin/main
 
             cat > .env << EOF
           COMPUTE_ITERATIONS=100000
