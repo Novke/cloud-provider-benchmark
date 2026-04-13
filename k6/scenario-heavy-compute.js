@@ -46,6 +46,10 @@ const timeoutRate = new Rate('timeouts');
 const computeLatency = new Trend('compute_latency');
 const successfulComputes = new Counter('successful_computes');
 
+// Explicit max VUs for compute scenario (CPU-heavy, fewer VUs than /quick scenarios)
+// Default 100 for cloud. Override: k6 run -e COMPUTE_VUS=50 k6/scenario-heavy-compute.js
+const COMPUTE_MAX_VUS = parseInt(__ENV.COMPUTE_VUS || '100', 10);
+
 // Calculate durations based on profile
 const constantDuration = profile.durations.sustain;
 const spikeDuration = profile.durations.peak;
@@ -62,33 +66,33 @@ function parseDuration(d) {
 const constantSeconds = parseDuration(constantDuration);
 const spikeSeconds = parseDuration(spikeDuration);
 
-// Build scenarios based on profile
+// Build scenarios scaled to COMPUTE_MAX_VUS
 const scenarios = {
-    // Constant load: low concurrent requests
+    // Constant load: 20% of max
     constant_load: {
         executor: 'constant-vus',
-        vus: Math.ceil(profile.vus.warmup / 5), // ~4-20 VUs depending on profile
+        vus: Math.ceil(COMPUTE_MAX_VUS * 0.2),
         duration: constantDuration,
         startTime: '0s',
     },
-    // Spike: Burst to moderate concurrent
+    // Spike: 50% of max
     spike: {
         executor: 'constant-vus',
-        vus: Math.ceil(profile.vus.moderate / 4), // ~12-50 VUs
+        vus: Math.ceil(COMPUTE_MAX_VUS * 0.5),
         duration: spikeDuration,
         startTime: `${constantSeconds}s`,
     },
-    // Peak: Higher concurrent (stress test)
+    // Peak: 100% of max
     peak: {
         executor: 'constant-vus',
-        vus: Math.ceil(profile.vus.peak / 5), // ~10-100 VUs
+        vus: COMPUTE_MAX_VUS,
         duration: spikeDuration,
         startTime: `${constantSeconds + spikeSeconds}s`,
     },
-    // Cool-down
+    // Cool-down: 10% of max
     cooldown: {
         executor: 'constant-vus',
-        vus: Math.ceil(profile.vus.warmup / 10), // ~2-10 VUs
+        vus: Math.ceil(COMPUTE_MAX_VUS * 0.1),
         duration: cooldownDuration,
         startTime: `${constantSeconds + spikeSeconds * 2}s`,
     },
@@ -119,7 +123,7 @@ export function setup() {
     console.log(`Profile: ${config.profile}`);
     console.log(`Iterations: ${config.computeIterations}`);
     console.log(`Estimated Duration: ~${estimatedDuration}ms per request`);
-    console.log(`Max VUs: ${Math.ceil(profile.vus.peak / 5)}`);
+    console.log(`Max VUs: ${COMPUTE_MAX_VUS}`);
     console.log(`URL: ${computeUrl}`);
     console.log('==============================');
     return config;
@@ -173,7 +177,7 @@ export function handleSummary(data) {
     const summary = {
         run_metadata: getRunMetadata(data.state?.testRunDurationMs),
         scenario: 'heavy-compute',
-        config: config,
+        config: { ...config, maxVus: COMPUTE_MAX_VUS },
         estimatedDurationMs: estimatedDuration,
         timeoutThresholdMs: timeoutThreshold,
         metrics: {
