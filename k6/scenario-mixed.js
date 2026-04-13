@@ -56,16 +56,20 @@ const ioNeutralLatency = new Trend('latency_io_neutral');
 const errorRate = new Rate('errors');
 const requestCounter = new Counter('total_requests');
 
-// Build stages based on profile
+// Cap VUs to avoid overwhelming IO endpoints (15% of VUs hit storage)
+// With 50 max: ~5 native IO VUs + ~2.5 neutral IO VUs at peak
+const MIXED_MAX_VUS = parseInt(__ENV.MIXED_VUS || '50', 10);
+
+// Build stages scaled to MIXED_MAX_VUS
 const stages = [
     // Warm-up
-    { duration: profile.durations.warmup, target: profile.vus.warmup },
+    { duration: profile.durations.warmup, target: Math.ceil(MIXED_MAX_VUS * 0.2) },
     // Ramp to moderate load
-    { duration: profile.durations.rampUp, target: profile.vus.moderate },
+    { duration: profile.durations.rampUp, target: Math.ceil(MIXED_MAX_VUS * 0.5) },
     // Sustain
-    { duration: profile.durations.sustain, target: profile.vus.moderate },
+    { duration: profile.durations.sustain, target: Math.ceil(MIXED_MAX_VUS * 0.5) },
     // Peak
-    { duration: profile.durations.peak, target: profile.vus.peak },
+    { duration: profile.durations.peak, target: MIXED_MAX_VUS },
     // Cool-down
     { duration: profile.durations.cooldown, target: 0 },
 ];
@@ -114,7 +118,7 @@ export function setup() {
     console.log('=== Mixed Workload Scenario ===');
     console.log(`Profile: ${config.profile}`);
     console.log(`Include IO: ${config.includeIO}`);
-    console.log(`Max VUs: ${config.maxVus}`);
+    console.log(`Max VUs: ${MIXED_MAX_VUS}`);
     console.log(`Base URL: ${config.baseUrl}`);
     if (!config.includeIO) {
         console.log('NOTE: /io-heavy endpoints skipped (local profile with mock backend)');
@@ -174,7 +178,7 @@ export function handleSummary(data) {
     const summary = {
         run_metadata: getRunMetadata(data.state?.testRunDurationMs),
         scenario: 'mixed',
-        config: config,
+        config: { ...config, maxVus: MIXED_MAX_VUS },
         metrics: {
             total_requests: data.metrics.total_requests?.values?.count || 0,
             throughput_rps: data.metrics.http_reqs?.values?.rate || 0,
