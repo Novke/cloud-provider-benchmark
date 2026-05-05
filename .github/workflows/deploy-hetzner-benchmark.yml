@@ -1,0 +1,62 @@
+name: Deploy to Hetzner Benchmark VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HETZNER_BENCHMARK_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.HETZNER_BENCHMARK_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Hetzner Benchmark VM
+        env:
+          HETZNER_BENCHMARK_HOST: ${{ secrets.HETZNER_BENCHMARK_HOST }}
+          HETZNER_BENCHMARK_USER: ${{ secrets.HETZNER_BENCHMARK_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $HETZNER_BENCHMARK_USER@$HETZNER_BENCHMARK_HOST << 'ENDSSH'
+            set -e
+
+            cd /srv/backend/cloud-benchmark
+
+            if [ ! -d ".git" ]; then
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git
+            fi
+            git fetch origin
+            git reset --hard origin/main
+
+            cat > .env << EOF
+          COMPUTE_ITERATIONS=100000
+          STORAGE_BACKEND_NATIVE=${{ secrets.HETZNER_BENCHMARK_STORAGE_BACKEND_NATIVE }}
+          STORAGE_BACKEND_NEUTRAL=r2
+          R2_ENDPOINT_URL=${{ secrets.R2_ENDPOINT_URL }}
+          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+          HETZNER_STORAGE_ENDPOINT_URL=${{ secrets.HETZNER_BENCHMARK_STORAGE_ENDPOINT_URL }}
+          HETZNER_STORAGE_ACCESS_KEY_ID=${{ secrets.HETZNER_BENCHMARK_STORAGE_ACCESS_KEY_ID }}
+          HETZNER_STORAGE_SECRET_ACCESS_KEY=${{ secrets.HETZNER_BENCHMARK_STORAGE_SECRET_ACCESS_KEY }}
+          HETZNER_STORAGE_BUCKET_NAME=${{ secrets.HETZNER_BENCHMARK_STORAGE_BUCKET_NAME }}
+          HETZNER_STORAGE_REGION=${{ secrets.HETZNER_BENCHMARK_STORAGE_REGION }}
+          EOF
+
+            sudo docker-compose down || true
+            sudo docker-compose build
+            sudo docker-compose up -d
+
+            sleep 5
+            curl -f http://localhost:8000/health || echo "Health check failed"
+          ENDSSH
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

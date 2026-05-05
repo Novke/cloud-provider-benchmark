@@ -33,10 +33,11 @@ class S3CompatibleBackend(StorageBackend):
     def _client_kwargs(self) -> dict:
         kwargs = {
             "service_name": "s3",
-            "aws_access_key_id": self._access_key_id,
-            "aws_secret_access_key": self._secret_access_key,
             "region_name": self._region_name,
         }
+        if self._access_key_id and self._secret_access_key:
+            kwargs["aws_access_key_id"] = self._access_key_id
+            kwargs["aws_secret_access_key"] = self._secret_access_key
         if self._endpoint_url:
             kwargs["endpoint_url"] = self._endpoint_url
         return kwargs
