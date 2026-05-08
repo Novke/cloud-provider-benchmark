@@ -46,8 +46,9 @@ def get_storage_backend(backend_type: str) -> StorageBackend:
 
     if backend_type == "azure_blob":
         return AzureBlobBackend(
-            connection_string=settings.azure_blob_connection_string,
             container_name=settings.azure_blob_container_name,
+            connection_string=settings.azure_blob_connection_string or None,
+            account_url=settings.azure_blob_account_url or None,
         )
 
     if backend_type == "gcs":

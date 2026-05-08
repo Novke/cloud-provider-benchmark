@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     s3_region: str = "eu-central-1"
 
     # Azure Blob Storage credentials - native storage on Azure
+    # Use account_url (with managed identity on Azure VM) OR connection_string (with embedded key)
+    azure_blob_account_url: str = ""
     azure_blob_connection_string: str = ""
     azure_blob_container_name: str = ""
 

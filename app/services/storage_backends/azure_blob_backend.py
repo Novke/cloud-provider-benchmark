@@ -7,16 +7,29 @@ class AzureBlobBackend(StorageBackend):
     """
     Azure Blob Storage backend using azure-storage-blob async API.
 
-    Used as native storage backend when running on Azure (VM, ACI, Functions).
+    Two auth modes:
+    - account_url + DefaultAzureCredential (preferred when running on Azure VM with managed identity)
+    - connection_string (embedded account key, for testing or non-Azure compute)
     """
 
-    def __init__(self, connection_string: str, container_name: str):
-        self._connection_string = connection_string
+    def __init__(
+        self,
+        container_name: str,
+        connection_string: str | None = None,
+        account_url: str | None = None,
+    ):
         self._container_name = container_name
+        self._connection_string = connection_string
+        self._account_url = account_url
 
     def _get_client(self):
         from azure.storage.blob.aio import BlobServiceClient
-        return BlobServiceClient.from_connection_string(self._connection_string)
+        if self._connection_string:
+            return BlobServiceClient.from_connection_string(self._connection_string)
+        if self._account_url:
+            from azure.identity.aio import DefaultAzureCredential
+            return BlobServiceClient(self._account_url, credential=DefaultAzureCredential())
+        raise ValueError("AzureBlobBackend requires either connection_string or account_url")
 
     async def read(self, key: str) -> bytes:
         async with self._get_client() as service:

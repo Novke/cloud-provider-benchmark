@@ -4,4 +4,5 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 aioboto3==13.1.1
 azure-storage-blob==12.25.1
+azure-identity==1.18.0
 gcloud-aio-storage==9.3.0
