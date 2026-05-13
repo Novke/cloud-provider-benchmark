@@ -1,0 +1,60 @@
+name: Deploy to Azure VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AZURE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.AZURE_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Azure VM
+        env:
+          AZURE_HOST: ${{ secrets.AZURE_HOST }}
+          AZURE_USER: ${{ secrets.AZURE_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key $AZURE_USER@$AZURE_HOST << 'ENDSSH'
+            set -e
+
+            cd /srv/backend/cloud-benchmark
+
+            if [ ! -d ".git" ]; then
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git
+            fi
+            git fetch origin
+            git reset --hard origin/main
+
+            cat > .env << EOF
+          COMPUTE_ITERATIONS=100000
+          STORAGE_BACKEND_NATIVE=${{ secrets.AZURE_STORAGE_BACKEND_NATIVE }}
+          STORAGE_BACKEND_NEUTRAL=r2
+          R2_ENDPOINT_URL=${{ secrets.R2_ENDPOINT_URL }}
+          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+          AZURE_BLOB_ACCOUNT_URL=${{ secrets.AZURE_BLOB_ACCOUNT_URL }}
+          AZURE_BLOB_CONTAINER_NAME=${{ secrets.AZURE_BLOB_CONTAINER_NAME }}
+          EOF
+
+            sudo docker compose version >/dev/null 2>&1 || sudo apt-get install -y docker-compose-v2
+            sudo docker compose down || true
+            sudo docker compose build
+            sudo docker compose up -d
+
+            sleep 5
+            curl -f http://localhost:8000/health || echo "Health check failed"
+          ENDSSH
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
