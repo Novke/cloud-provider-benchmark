@@ -213,4 +213,8 @@ CL*.md
 k6/results/
 k6/env/*.bat
 
+# Staging directories and temp files for deploys (IAM JSON, deploy zips, etc.)
+.deploy/
+.tmp/
+
 resources/
