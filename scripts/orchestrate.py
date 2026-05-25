@@ -7,6 +7,13 @@ first-mover bias, odbacuje warm-up, tagira mjerenja.
 Output: standardni k6 layout `k6/results/<provider>/<arch>/<scenario>/<timestamp>__s<session>_n<iter>/`
 gde je session sesijski ID i iter iteracijski broj (0=warm-up, 1..N=mjerenje).
 
+Vazno za cold-start: orchestrator pokrece sve `cold-start` scenarije PRVI u sesiji
+(pre warmup-a i pre ostalih scenarija) jer inter-session gap od 6-11h izmedju
+stratified slot-ova (09/15/22) garantovano scale-uje FaaS instance i CaaS-min=0
+instance na zero. Time je prvi cold-start poziv sesije pravo mjerenje
+scale-from-zero latencije. Ako bismo cold-start ostavili u randomized fazi,
+prethodni scenariji bi vec zagrejali instance i merenje bi bilo beskorisno.
+
 Usage:
     python scripts/orchestrate.py --config scripts/orchestrate.config.yaml
     python scripts/orchestrate.py --config <cfg> --session-id morning --warmup 1 --iterations 10
@@ -162,19 +169,48 @@ def build_run_specs(cfg: Config, session_id: str, rng: random.Random) -> list[Ru
     """
     Konstruise listu runova za jednu sesiju.
 
-    Strategija randomizacije:
-      1. Warm-up runovi prvi (jedan po Target × scenario kombinaciji, redom kako su definisani)
-      2. Mjerni runovi: kreiramo listu svih (Target, scenario, iteration) trojki, pa shuffle
-         celokupne liste. To znaci da unutar sesije razliciti provajderi se prepliću
-         random redom — first-mover bias se eliminise *unutar* sesije.
+    Strategija randomizacije (3 faze):
+      Phase 0 — cold-start scenariji PRVI, jedan po target-u, NEMA warmup-a.
+                Razlog: cold-start meri prvu invokaciju nove instance. Inter-session
+                gap (6-11h izmedju stratified slot-ova) je >> warm-window svih FaaS-a
+                (5-15 min) i CaaS-ova sa min=0, pa je instanca garantovano hladna.
+                Warmup pre cold-start-a bi defeat-ovao smisao. Redosled medju
+                target-ima je shuffle-ovan da nijedan provajder nije konzistentno prvi.
+
+      Phase 1 — warmup runovi za sve non-cold-start cell-e (jedan po Target × scenario)
+                redom kako su definisani. Po convention, warmup je marker da se DNS,
+                connection pool i JIT zagreju za sledece mjerno fakticko mjerenje.
+
+      Phase 2 — mjerni runovi za sve non-cold-start (Target × scenario × iteration)
+                kombinacije, shuffle-ovani kao jedna lista. Eliminise first-mover bias
+                tako sto provajderi i scenariji se prepliću random redom.
     """
     session_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
 
-    warmups: list[RunSpec] = []
-    measurements: list[RunSpec] = []
+    cold_starts: list[RunSpec] = []   # Phase 0
+    warmups: list[RunSpec] = []        # Phase 1
+    measurements: list[RunSpec] = []    # Phase 2
 
     for target in cfg.targets:
         for scenario in target.scenarios:
+            if scenario == "cold-start":
+                # Phase 0 — cold-start preko target-a. Bez warmup-a (cilj je hladno).
+                # Iteration broj je samo 1..N (svaka sesija po jednu mjerenje na cold instanci;
+                # za vise cold mjerenja u kratkom periodu treba namerno cekanje 5-15 min,
+                # sto se postize dedicated full-mode runom van orchestrator-a).
+                for n in range(1, cfg.iterations + 1):
+                    cold_starts.append(
+                        RunSpec(
+                            target=target,
+                            scenario=scenario,
+                            iteration=n,
+                            session_id=session_id,
+                            session_timestamp=session_ts,
+                        )
+                    )
+                continue
+
+            # Phase 1 + 2 za non-cold-start scenarije
             for w in range(cfg.warmup_runs):
                 warmups.append(
                     RunSpec(
@@ -196,8 +232,9 @@ def build_run_specs(cfg: Config, session_id: str, rng: random.Random) -> list[Ru
                     )
                 )
 
+    rng.shuffle(cold_starts)
     rng.shuffle(measurements)
-    return warmups + measurements
+    return cold_starts + warmups + measurements
 
 
 def k6_command(spec: RunSpec) -> list[str]:
