@@ -217,4 +217,12 @@ k6/env/*.bat
 .deploy/
 .tmp/
 
+# DuckDB analytical store (built locally from k6/results/, synced from VPS via scp)
+benchmark.duckdb
+*.duckdb.wal
+nul
+
+# Local orchestrator config (contains live URLs); commit only the .example.yaml template
+scripts/orchestrate.config.yaml
+
 resources/

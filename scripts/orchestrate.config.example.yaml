@@ -1,0 +1,92 @@
+# Example orchestrator config. Kopiraj u scripts/orchestrate.config.yaml i prilagodi URL-ove
+# stvarnim endpoint-ima iz k6/env/*.bat (vrednosti su lokalne i ne idu u git).
+#
+# Korisni override-i preko CLI:
+#   python scripts/orchestrate.py --config scripts/orchestrate.config.yaml \
+#                                  --session-id morning --iterations 10 --warmup 1
+#
+# Za 24-72h stratified time-slot benchmark, pokrece se 3 puta dnevno preko systemd
+# timer-a (vidi deploy/systemd/) sa session-id-ovima: morning / afternoon / night.
+
+iterations: 10
+warmup_runs: 1
+inter_run_sleep_sec: 5
+health_check_timeout_sec: 30
+health_check_retries: 2
+
+targets:
+  # ---------------- IaaS sloj (3+1 provajdera) ----------------
+  - provider: gcp
+    arch: iaas
+    url: http://35.246.182.190:8000
+    region: europe-west3
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  - provider: aws
+    arch: iaas
+    url: http://18.185.48.126:8000
+    region: eu-central-1
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  - provider: azure
+    arch: iaas
+    url: http://51.116.237.102:8000
+    region: germanywestcentral
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  # Hetzner — uncomment kad IP bude poznat
+  # - provider: hetzner
+  #   arch: iaas
+  #   url: http://TBD:8000
+  #   region: eu-falkenstein
+  #   profile: cloud
+  #   scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  # ---------------- CaaS sloj (3 provajdera, Hetzner out-of-scope) ----------------
+  - provider: gcp
+    arch: caas
+    url: https://benchmark-caas-839326220134.europe-west3.run.app
+    region: europe-west3
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  - provider: aws
+    arch: caas
+    url: https://ctmjikarp5.eu-central-1.awsapprunner.com
+    region: eu-central-1
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  - provider: azure
+    arch: caas
+    url: https://benchmark-caas.jollysky-1427eea1.germanywestcentral.azurecontainerapps.io
+    region: germanywestcentral
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+
+  # ---------------- FaaS sloj (3 provajdera) ----------------
+  # NAPOMENA: FaaS scenarios izostavljaju mixed/high-traffic jer udaraju u max-instances cap
+  # i prelaze rezonabilan budget. cold-start je primarni FaaS metric.
+  - provider: gcp
+    arch: faas
+    url: https://europe-west3-cloud-benchmark-493210.cloudfunctions.net/benchmark-faas
+    region: europe-west3
+    profile: faas
+    scenarios: [cold-start, low-traffic, heavy-compute, io-native, io-neutral]
+
+  - provider: aws
+    arch: faas
+    url: https://dhaisequ9l.execute-api.eu-central-1.amazonaws.com
+    region: eu-central-1
+    profile: faas
+    scenarios: [cold-start, low-traffic, heavy-compute, io-native, io-neutral]
+
+  - provider: azure
+    arch: faas
+    url: https://benchmark-faas.azurewebsites.net
+    region: germanywestcentral
+    profile: faas
+    scenarios: [cold-start, low-traffic, heavy-compute, io-native, io-neutral]
