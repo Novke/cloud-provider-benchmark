@@ -1,0 +1,11 @@
+[Unit]
+Description=Benchmark — morning slot (09:00)
+
+[Timer]
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+AccuracySec=1min
+Unit=benchmark@morning.service
+
+[Install]
+WantedBy=timers.target

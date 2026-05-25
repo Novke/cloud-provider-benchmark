@@ -1,0 +1,22 @@
+[Unit]
+Description=Cloud-provider benchmark sesija (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=benchmark
+WorkingDirectory=/opt/cloud-provider-benchmark
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# %i je instance ime (morning / afternoon / night) — postaje session-id u DuckDB row-u.
+ExecStart=/usr/bin/python3 /opt/cloud-provider-benchmark/scripts/orchestrate.py \
+    --config /opt/cloud-provider-benchmark/scripts/orchestrate.config.yaml \
+    --session-id %i
+ExecStartPost=/usr/bin/python3 /opt/cloud-provider-benchmark/scripts/aggregate.py \
+    --db /opt/cloud-provider-benchmark/benchmark.duckdb \
+    --results /opt/cloud-provider-benchmark/k6/results
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=benchmark-%i
+TimeoutStartSec=10800
+Restart=no
