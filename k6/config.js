@@ -86,6 +86,34 @@ const profiles = {
         // Strict thresholds for cloud benchmarking
         thresholdMultiplier: 1.0,
     },
+    // FaaS profile — kalibrisan za scale-to-zero managed FaaS (Cloud Functions
+    // Gen 2, Lambda, Azure Functions Y1). Razlozi za drasticno nize VUs nego cloud:
+    //   * FaaS concurrency=1 po instanci → svaki paralelan request spawn-uje
+    //     novu instancu (cold start cost)
+    //   * Postavljen max-instances=5 (CF/Container Apps) i Lambda account quota
+    //     ConcurrentExecutions=10 → vise VUs samo daje 429 throttle
+    //   * Pay-per-invocation: 500 VUs × 10 min bi potrosilo Lambda free tier
+    //     odmah; ovaj profil drzi sesiju u low-USD opsegu
+    faas: {
+        name: 'faas',
+        durations: {
+            warmup: '15s',
+            rampUp: '30s',
+            sustain: '2m',
+            peak: '30s',
+            cooldown: '15s',
+            total: '3m',
+        },
+        vus: {
+            warmup: 2,
+            moderate: 5,
+            peak: 10,
+            max: 10,
+        },
+        includeIO: true,
+        // Relaxed thresholds — FaaS p99 ukljucuje cold start
+        thresholdMultiplier: 2.0,
+    },
 };
 
 // Export active profile
