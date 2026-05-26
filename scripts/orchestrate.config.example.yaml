@@ -37,13 +37,12 @@ targets:
     profile: cloud
     scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
 
-  # Hetzner — uncomment kad IP bude poznat
-  # - provider: hetzner
-  #   arch: iaas
-  #   url: http://TBD:8000
-  #   region: eu-falkenstein
-  #   profile: cloud
-  #   scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
+  - provider: hetzner
+    arch: iaas
+    url: http://178.105.101.205:8000
+    region: fsn1
+    profile: cloud
+    scenarios: [mixed, low-traffic, heavy-compute, io-native, io-neutral, cold-start]
 
   # ---------------- CaaS sloj (3 provajdera, Hetzner out-of-scope) ----------------
   - provider: gcp
