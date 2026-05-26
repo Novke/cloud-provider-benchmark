@@ -49,9 +49,10 @@ jobs:
           HETZNER_STORAGE_REGION=${{ secrets.HETZNER_BENCHMARK_STORAGE_REGION }}
           EOF
 
-            sudo docker-compose down || true
-            sudo docker-compose build
-            sudo docker-compose up -d
+            sudo docker compose version >/dev/null 2>&1 || sudo apt-get install -y docker-compose-v2
+            sudo docker compose down || true
+            sudo docker compose build
+            sudo docker compose up -d
 
             sleep 5
             curl -f http://localhost:8000/health || echo "Health check failed"
