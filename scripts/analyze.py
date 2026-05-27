@@ -103,8 +103,8 @@ METRIC_BY_SCENARIO = {
     "low-traffic": "ttfb_p95",
     "high-traffic": "ttfb_p95",
     "heavy-compute": "ttfb_p95",
-    "io-native": "endpoint_io_native_p95",
-    "io-neutral": "endpoint_io_neutral_p95",
+    "io-native": "latency_p95",
+    "io-neutral": "latency_p95",
     "cold-start": "first_request_avg",
 }
 

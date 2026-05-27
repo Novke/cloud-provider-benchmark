@@ -256,7 +256,13 @@ def k6_command(spec: RunSpec) -> list[str]:
         "-e", f"K6_RESULTS_DIR={spec.results_dir.as_posix()}",
         "-e", f"RUN_NUMBER={spec.iteration}",
     ]
-    return ["k6", "run", *env_args, *scenario_args, script]
+    # --no-thresholds: k6 thresholds (p95<2000 itd.) su CI-gating koncept; za
+    # benchmark zelimo da zabelezimo latenciju BEZ OBZIRA koliko je visoka.
+    # Bez ovog flag-a, spori runovi (npr. AWS io-native ~7s) vracaju exit 99
+    # (threshold crossed) i orchestrator ih lazno markira kao failure iako su
+    # podaci validni i kompletni. Error rate / latencija se ionako belaze kao
+    # metrike u analysis.json.
+    return ["k6", "run", "--no-thresholds", *env_args, *scenario_args, script]
 
 
 def execute(spec: RunSpec, cfg: Config, dry_run: bool) -> dict:

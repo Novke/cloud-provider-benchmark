@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS runs (
     ttfb_min              DOUBLE,
     ttfb_max              DOUBLE,
 
+    -- Full request latency (http_req_duration) — glavni metric za io-native/io-neutral
+    -- (end-to-end: mreza + server write + server read)
+    latency_avg           DOUBLE,
+    latency_p50           DOUBLE,
+    latency_p90           DOUBLE,
+    latency_p95           DOUBLE,
+    latency_p99           DOUBLE,
+
+    -- Server-side io timing (samo io scenariji)
+    server_write_p95      DOUBLE,
+    server_write_avg      DOUBLE,
+    server_read_p95       DOUBLE,
+    server_read_avg       DOUBLE,
+
     -- Connection timing breakdown
     conn_connecting_avg   DOUBLE,
     conn_tls_avg          DOUBLE,
@@ -236,6 +250,15 @@ def row_from_analysis(path: Path) -> dict[str, Any] | None:
         "ttfb_p99": _safe_get(metrics, "ttfb", "p99"),
         "ttfb_min": _safe_get(metrics, "ttfb", "min"),
         "ttfb_max": _safe_get(metrics, "ttfb", "max"),
+        "latency_avg": _safe_get(metrics, "latency", "avg"),
+        "latency_p50": _safe_get(metrics, "latency", "p50"),
+        "latency_p90": _safe_get(metrics, "latency", "p90"),
+        "latency_p95": _safe_get(metrics, "latency", "p95"),
+        "latency_p99": _safe_get(metrics, "latency", "p99"),
+        "server_write_p95": _safe_get(metrics, "server_write_ms", "p95"),
+        "server_write_avg": _safe_get(metrics, "server_write_ms", "avg"),
+        "server_read_p95": _safe_get(metrics, "server_read_ms", "p95"),
+        "server_read_avg": _safe_get(metrics, "server_read_ms", "avg"),
         "conn_connecting_avg": _safe_get(metrics, "connection", "connecting", "avg"),
         "conn_tls_avg": _safe_get(metrics, "connection", "tls_handshaking", "avg"),
         "conn_sending_avg": _safe_get(metrics, "connection", "sending", "avg"),
