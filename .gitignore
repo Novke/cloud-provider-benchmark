@@ -222,7 +222,8 @@ benchmark.duckdb
 *.duckdb.wal
 nul
 
-# Local orchestrator config (contains live URLs); commit only the .example.yaml template
+# Local orchestrator configs (contain live URLs); commit only the .example.yaml template
 scripts/orchestrate.config.yaml
+scripts/orchestrate.config.coldstart.yaml
 
 resources/
