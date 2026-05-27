@@ -87,13 +87,15 @@ const profiles = {
         thresholdMultiplier: 1.0,
     },
     // FaaS profile — kalibrisan za scale-to-zero managed FaaS (Cloud Functions
-    // Gen 2, Lambda, Azure Functions Y1). Razlozi za drasticno nize VUs nego cloud:
-    //   * FaaS concurrency=1 po instanci → svaki paralelan request spawn-uje
-    //     novu instancu (cold start cost)
-    //   * Postavljen max-instances=5 (CF/Container Apps) i Lambda account quota
-    //     ConcurrentExecutions=10 → vise VUs samo daje 429 throttle
-    //   * Pay-per-invocation: 500 VUs × 10 min bi potrosilo Lambda free tier
-    //     odmah; ovaj profil drzi sesiju u low-USD opsegu
+    // Gen 2, Lambda, Azure Functions Y1). Max 5 VU namerno:
+    //   * Matchuje GCP CF Gen2 max-instances=5 (concurrency=1) — sa vise VU
+    //     GCP FaaS samo kvjuuje, zagadjuje latenciju queue delay-om
+    //   * Ispod AWS Lambda account concurrency limita (10, new-account cap) →
+    //     nema 429 throttle (smoke run sa 10 VU je dao 44-77% errora na AWS FaaS)
+    //   * FaaS concurrency=1 po instanci → svaki paralelan request = nova instanca
+    //   * Pay-per-invocation: drzi sesiju u low-USD opsegu
+    // Empirijski potvrdjeno (2026-05-28 smoke): 10 VU = AWS Lambda throttle;
+    // 5 VU je fer kros sva 3 FaaS-a i ispod svih scaling limita.
     faas: {
         name: 'faas',
         durations: {
@@ -105,10 +107,10 @@ const profiles = {
             total: '3m',
         },
         vus: {
-            warmup: 2,
-            moderate: 5,
-            peak: 10,
-            max: 10,
+            warmup: 1,
+            moderate: 3,
+            peak: 5,
+            max: 5,
         },
         includeIO: true,
         // Relaxed thresholds — FaaS p99 ukljucuje cold start
