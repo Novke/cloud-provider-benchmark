@@ -47,8 +47,9 @@ const computeLatency = new Trend('compute_latency');
 const successfulComputes = new Counter('successful_computes');
 
 // Explicit max VUs for compute scenario (CPU-heavy, fewer VUs than /quick scenarios)
-// Default 100 for cloud. Override: k6 run -e COMPUTE_VUS=50 k6/scenario-heavy-compute.js
-const COMPUTE_MAX_VUS = parseInt(__ENV.COMPUTE_VUS || '100', 10);
+// FaaS profil: 5 (matchuje GCP CF max-instances=5, ispod AWS Lambda concurrency=10).
+// Cloud/local profili: 100 (default). Override: -e COMPUTE_VUS=...
+const COMPUTE_MAX_VUS = parseInt(__ENV.COMPUTE_VUS || (profile.name === 'faas' ? '5' : '100'), 10);
 
 // Calculate durations based on profile
 const constantDuration = profile.durations.sustain;

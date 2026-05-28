@@ -44,7 +44,10 @@ if (!IO_BACKEND || (IO_BACKEND !== 'native' && IO_BACKEND !== 'neutral')) {
 }
 
 const IO_BYTES = parseInt(__ENV.IO_BYTES || '1024', 10);
-const IO_MAX_VUS = parseInt(__ENV.IO_VUS || '50', 10);
+// FaaS profil: default 5 VU (matchuje GCP CF max-instances=5, ispod AWS Lambda
+// concurrency=10 limita). Cloud/local profili: default 50 VU (per-request io je
+// tezi pa svesno nizji od cloud profile max=500).
+const IO_MAX_VUS = parseInt(__ENV.IO_VUS || (profile.name === 'faas' ? '5' : '50'), 10);
 
 // Custom metrics
 const ioLatency = new Trend('io_latency');
