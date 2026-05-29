@@ -384,10 +384,29 @@ def main(argv: list[str] | None = None) -> int:
         if log_entries:
             write_session_log(args.session_id, session_ts, log_entries)
 
-    ok = sum(1 for e in log_entries if e.get("status") == "ok")
-    total = sum(1 for e in log_entries if not e.get("is_warmup"))
+    # Uspeh racunamo SAMO nad measurement runovima (warmup-ovi se odbacuju).
+    # Raniji bug: `ok` je brojao i warmup-ove (i oni dobiju status "ok"), pa je
+    # pri warmup_runs>0 uvek bilo ok>total -> exit 1, sto je (a) lazno markiralo
+    # sesiju kao failed i (b) sprecavalo systemd ExecStartPost (aggregate.py) da
+    # se uopste pokrene -> DuckDB ostaje neazuriran.
+    measurement_entries = [e for e in log_entries if not e.get("is_warmup")]
+    ok = sum(1 for e in measurement_entries if e.get("status") == "ok")
+    total = len(measurement_entries)
     log.info("Done. %d/%d measurement runs OK", ok, total)
-    return 0 if ok == total else 1
+    if ok < total:
+        failed = [
+            f"{e['provider']}/{e['arch']}/{e['scenario']}(n={e['iteration']},{e.get('status')})"
+            for e in measurement_entries
+            if e.get("status") != "ok"
+        ]
+        log.warning("%d measurement run(s) nisu OK: %s", total - ok, ", ".join(failed))
+    # Exit 0 i kad pojedinacni runovi padnu: u unattended kampanji su parcijalni
+    # failovi ocekivani (FaaS throttle, prolazni health blip) i NE smeju da blokiraju
+    # downstream aggregate (systemd ExecStartPost) niti da markiraju celu sesiju kao
+    # failed. Pali runovi su vidljivi u session log-u + kao nizi N po cell-u u DuckDB-u.
+    # Katastrofalne pre-flight greske (nema configa / targeta / k6) vec vracaju
+    # non-zero PRE nego sto ijedan run krene.
+    return 0
 
 
 if __name__ == "__main__":
