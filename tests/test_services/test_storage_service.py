@@ -72,9 +72,14 @@ def test_get_storage_backend_invalid_type() -> None:
     assert "invalid-type" in str(exc_info.value)
 
 
-def test_get_storage_backend_returns_new_instance() -> None:
-    """Test that factory returns new instance each time."""
+def test_get_storage_backend_returns_cached_instance() -> None:
+    """Factory kešira backend po tipu i reuse-uje isti instance.
+
+    Reuse je namerni dizajn (Nalaz #12): instanca se reuse-uje da bi se SDK klijent
+    (connection pool / credential) reuse-ovao umesto da se pravi po pozivu. Cache se
+    resetuje izmedju testova preko cleanup_mock_storage fixture-a.
+    """
     backend1 = get_storage_backend("mock")
     backend2 = get_storage_backend("mock")
 
-    assert backend1 is not backend2
+    assert backend1 is backend2

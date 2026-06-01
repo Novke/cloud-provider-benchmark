@@ -32,3 +32,13 @@ class StorageBackend(ABC):
             data: Data to write.
         """
         pass
+
+    async def close(self) -> None:
+        """
+        Release any held client/connection resources.
+
+        Default is a no-op. Backends koji drze dugotrajan SDK klijent
+        (S3/Azure/GCS) override-uju ovo da zatvore konekcije. Poziva se
+        iz storage_service.close_storage_backends() (npr. u testovima).
+        """
+        return None

@@ -6,6 +6,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.services.storage_backends import MockStorageBackend
+from app.services.storage_service import reset_storage_backend_cache
 
 
 @pytest_asyncio.fixture
@@ -33,5 +34,6 @@ def cleanup_mock_storage():
     """
     # Setup: nothing needed before test
     yield
-    # Teardown: clear storage after test
+    # Teardown: clear storage + izbaci keširane backend instance (izolacija)
     MockStorageBackend.clear()
+    reset_storage_backend_cache()

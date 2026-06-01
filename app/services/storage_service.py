@@ -11,20 +11,40 @@ from .storage_backends import (
 )
 
 
+# Cache jednog backend instance po tipu. Bez ovoga, io_heavy router pravi nov
+# backend (a backend nov SDK klijent) na SVAKI request → pod konkurentnoscu to
+# dominira merenje (pool/credential init), ne storage performanse. Reuse instance
+# + reuse klijenta unutar nje = fer storage poredjenje. Vidi Nalaz #12.
+_BACKEND_CACHE: dict[str, StorageBackend] = {}
+
+
 def get_storage_backend(backend_type: str) -> StorageBackend:
     """
-    Factory function to get storage backend instance.
+    Factory: vrati (keširан) storage backend instance po tipu.
+
+    Instance se kreira jednom i reuse-uje kroz requestove, da bi se SDK klijent
+    (i konekcioni pool / credential) reuse-ovao umesto da se pravi po pozivu.
 
     Args:
         backend_type: Type of backend to create.
-            Supported: "mock", "r2", "s3", "azure_blob", "gcs"
+            Supported: "mock", "r2", "s3", "azure_blob", "gcs", "hetzner_storage"
 
     Returns:
-        StorageBackend instance.
+        StorageBackend instance (keširан).
 
     Raises:
         ValueError: If backend_type is not supported.
     """
+    cached = _BACKEND_CACHE.get(backend_type)
+    if cached is not None:
+        return cached
+    backend = _create_storage_backend(backend_type)
+    _BACKEND_CACHE[backend_type] = backend
+    return backend
+
+
+def _create_storage_backend(backend_type: str) -> StorageBackend:
+    """Konstruise nov backend instance (bez kesiranja)."""
     if backend_type == "mock":
         return MockStorageBackend()
 
@@ -71,3 +91,15 @@ def get_storage_backend(backend_type: str) -> StorageBackend:
         f"Unsupported storage backend type: '{backend_type}'. "
         f"Supported types: {supported}"
     )
+
+
+async def close_storage_backends() -> None:
+    """Zatvori i izbaci sve keširane backend-e (oslobodi konekcije)."""
+    for backend in _BACKEND_CACHE.values():
+        await backend.close()
+    _BACKEND_CACHE.clear()
+
+
+def reset_storage_backend_cache() -> None:
+    """Izbaci cache bez async close-a (za test izolaciju)."""
+    _BACKEND_CACHE.clear()
