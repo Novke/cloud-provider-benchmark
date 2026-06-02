@@ -288,11 +288,19 @@ def execute(spec: RunSpec, cfg: Config, dry_run: bool) -> dict:
         "results_dir": spec.results_dir.as_posix(),
     }
 
-    if not health_check(spec.target.url, cfg.health_check_timeout_sec, cfg.health_check_retries):
-        log.error("HEALTH FAIL — preskacem run")
-        entry["status"] = "health_check_failed"
-        entry["finished_at"] = datetime.now(timezone.utc).isoformat()
-        return entry
+    # Cold-start scenario: NE radimo pre-run health-check. Health-check pinguje
+    # /health sto bi zagrejalo scale-to-zero instancu (FaaS/CaaS min=0) PRE nego sto
+    # k6 izmeri cold start → cold start bi bio apsorbovan u health-check i izgubljen
+    # (empirijski: cold_starts_detected ~0 dok je health-check bio aktivan). k6
+    # cold-start skripta i onako salje /health kao svoj prvi request, sto sluzi i kao
+    # liveness provera i kao samo cold-start merenje. Za sve ostale scenarije zelimo
+    # warm instancu, pa health-check ostaje (i sluzi kao implicitni warmup).
+    if spec.scenario != "cold-start":
+        if not health_check(spec.target.url, cfg.health_check_timeout_sec, cfg.health_check_retries):
+            log.error("HEALTH FAIL — preskacem run")
+            entry["status"] = "health_check_failed"
+            entry["finished_at"] = datetime.now(timezone.utc).isoformat()
+            return entry
 
     cmd = k6_command(spec)
     log.debug("$ %s", " ".join(cmd))

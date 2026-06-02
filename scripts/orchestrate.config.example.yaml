@@ -11,8 +11,11 @@
 iterations: 10
 warmup_runs: 1
 inter_run_sleep_sec: 5
-health_check_timeout_sec: 30
-health_check_retries: 2
+# Health-check (pre-run liveness za NE-cold-start scenarije; cold-start ga preskace).
+# 60s + 3 retry-a: FaaS cold start (npr. GCP CF Gen2 ASGI bootstrap ~10s, povremeno
+# i duze) ume da probije 30s na prvom NE-cold-start scenariju posle scale-to-zero gap-a.
+health_check_timeout_sec: 60
+health_check_retries: 3
 
 targets:
   # ---------------- IaaS sloj (3+1 provajdera) ----------------
