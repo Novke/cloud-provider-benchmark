@@ -1,0 +1,66 @@
+# Sweep config (Eksperiment 2 + 3) — io payload sweep + compute sweep.
+# Karakterizacija scaling krivih; NE time-stratifikovano (back-to-back, N=3-5).
+# Pokrece se POSLE glavne kampanje kao dedicated batch (vidi plan + Metodologija §sweep).
+#
+# Parametrizovani scenario unosi: orchestrator ekspanduje svaki sweep u 1 run po
+# vrednosti i tagira results-dir parametrom (k6/results/<prov>/<arch>/io-native/io_bytes-1048576/...).
+# Obican string scenario = bez sweep-a (kao u glavnom config-u).
+#
+# Kopiraj u scripts/orchestrate.config.sweep.yaml i prilagodi URL-ove (vrednosti su lokalne, ne idu u git).
+
+iterations: 3
+warmup_runs: 1
+inter_run_sleep_sec: 5
+health_check_timeout_sec: 60
+health_check_retries: 3
+
+# Sweep vrednosti (rereferences — orchestrator ih cita iz svakog targeta dole):
+#   IO_BYTES: [1024, 10240, 102400, 1048576]        # 1KB / 10KB / 100KB / 1MB (3 reda velicine)
+#   COMPUTE_ITERATIONS: [10000, 100000, 500000]     # light / default / heavy
+
+targets:
+  # ---------------- IaaS ----------------
+  - {provider: gcp, arch: iaas, url: "http://35.246.182.190:8000", region: europe-west3, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: aws, arch: iaas, url: "http://18.185.48.126:8000", region: eu-central-1, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: azure, arch: iaas, url: "http://51.116.237.102:8000", region: germanywestcentral, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: hetzner, arch: iaas, url: "http://178.105.101.205:8000", region: fsn1, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+
+  # ---------------- CaaS ----------------
+  - {provider: gcp, arch: caas, url: "https://benchmark-caas-839326220134.europe-west3.run.app", region: europe-west3, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: aws, arch: caas, url: "https://ctmjikarp5.eu-central-1.awsapprunner.com", region: eu-central-1, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: azure, arch: caas, url: "https://benchmark-caas.jollysky-1427eea1.germanywestcentral.azurecontainerapps.io", region: germanywestcentral, profile: cloud,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+
+  # ---------------- FaaS (faas profil, 5 VU cap) ----------------
+  - {provider: gcp, arch: faas, url: "https://europe-west3-cloud-benchmark-493210.cloudfunctions.net/benchmark-faas", region: europe-west3, profile: faas,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: aws, arch: faas, url: "https://dhaisequ9l.execute-api.eu-central-1.amazonaws.com", region: eu-central-1, profile: faas,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}
+  - {provider: azure, arch: faas, url: "https://benchmark-faas.azurewebsites.net", region: germanywestcentral, profile: faas,
+     scenarios: [{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: io-neutral, sweep: {IO_BYTES: [1024, 10240, 102400, 1048576]}},
+                 {name: heavy-compute, sweep: {COMPUTE_ITERATIONS: [10000, 100000, 500000]}}]}

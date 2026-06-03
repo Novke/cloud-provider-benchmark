@@ -48,6 +48,7 @@ omogucava stratified time-of-day analizu u Phase 3 (vidi scripts/analyze.ipynb).
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import logging
 import os
@@ -77,6 +78,20 @@ log = logging.getLogger("orchestrate")
 
 
 @dataclass(frozen=True)
+class ScenarioSpec:
+    """Jedan scenario unos iz config-a — ime + opcioni parametarski sweep.
+
+    Config moze dati scenario kao obican string (`low-traffic`) ili kao dict sa
+    sweep-om:  `{name: io-native, sweep: {IO_BYTES: [1024, 10240, 102400]}}`.
+    Sweep se ekspanduje u 1 run po vrednosti (cartesian product ako vise param-a).
+    `sweep` je tuple parova (param, tuple_vrednosti) da bi dataclass ostao hashable.
+    """
+
+    name: str
+    sweep: tuple[tuple[str, tuple], ...] = ()
+
+
+@dataclass(frozen=True)
 class Target:
     """Jedan (provider, arch, url) target sa listom scenarija."""
 
@@ -85,18 +100,22 @@ class Target:
     url: str
     region: str
     profile: str
-    scenarios: tuple[str, ...]
+    scenarios: tuple[ScenarioSpec, ...]
 
 
 @dataclass(frozen=True)
 class RunSpec:
-    """Jedan konkretan benchmark run (Target × scenario × iteration)."""
+    """Jedan konkretan benchmark run (Target × scenario × iteration [× sweep])."""
 
     target: Target
     scenario: str
     iteration: int  # 0 = warmup, 1..N = mjerenje
     session_id: str
     session_timestamp: str  # session-level timestamp za output path
+    # Sweep parametri za ovaj run (npr. (("IO_BYTES","1048576"),)) — prazno za obicne.
+    env_overrides: tuple[tuple[str, str], ...] = ()
+    # Filesystem-safe tag sweep-a za results-dir (npr. "io_bytes-1048576") — prazno za obicne.
+    sweep_tag: str = ""
 
     @property
     def is_warmup(self) -> bool:
@@ -107,7 +126,11 @@ class RunSpec:
         tag = f"{self.session_timestamp}__s{self.session_id}_n{self.iteration:02d}"
         if self.is_warmup:
             tag = f"{self.session_timestamp}__s{self.session_id}_warmup"
-        return Path("k6") / "results" / self.target.provider / self.target.arch / self.scenario / tag
+        base = Path("k6") / "results" / self.target.provider / self.target.arch / self.scenario
+        # Sweep run-ovi dobijaju zaseban pod-folder po parametru da se ne prepisuju.
+        if self.sweep_tag:
+            base = base / self.sweep_tag
+        return base / tag
 
 
 @dataclass
@@ -118,6 +141,37 @@ class Config:
     health_check_timeout_sec: int = 30
     health_check_retries: int = 2
     targets: list[Target] = field(default_factory=list)
+
+
+def _parse_scenario(entry) -> ScenarioSpec:
+    """Parsira jedan scenario unos: string ili {name, sweep} dict."""
+    if isinstance(entry, str):
+        return ScenarioSpec(name=entry)
+    if isinstance(entry, dict):
+        name = entry["name"]
+        sweep_raw = entry.get("sweep", {}) or {}
+        sweep = tuple((str(k), tuple(v)) for k, v in sweep_raw.items())
+        return ScenarioSpec(name=name, sweep=sweep)
+    raise ValueError(f"Neispravan scenario unos: {entry!r} (mora biti string ili {{name, sweep}})")
+
+
+def expand_sweep(sweep: tuple[tuple[str, tuple], ...]) -> list[tuple[tuple[tuple[str, str], ...], str]]:
+    """Ekspanduje sweep u listu (env_overrides, sweep_tag) parova.
+
+    Bez sweep-a → [((), "")] (jedan run, prazni override). Sa sweep-om → cartesian
+    product svih param vrednosti. env_overrides je tuple (PARAM, str(value)) parova;
+    sweep_tag je filesystem-safe (npr. "io_bytes-1048576").
+    """
+    if not sweep:
+        return [((), "")]
+    params = [p for p, _ in sweep]
+    value_lists = [vals for _, vals in sweep]
+    out = []
+    for combo in itertools.product(*value_lists):
+        env = tuple((p, str(v)) for p, v in zip(params, combo))
+        tag = "_".join(f"{p.lower()}-{v}" for p, v in zip(params, combo))
+        out.append((env, tag))
+    return out
 
 
 def parse_config(path: Path) -> Config:
@@ -131,7 +185,7 @@ def parse_config(path: Path) -> Config:
                 url=t["url"],
                 region=t["region"],
                 profile=t["profile"],
-                scenarios=tuple(t["scenarios"]),
+                scenarios=tuple(_parse_scenario(s) for s in t["scenarios"]),
             )
         )
     return Config(
@@ -192,45 +246,54 @@ def build_run_specs(cfg: Config, session_id: str, rng: random.Random) -> list[Ru
     measurements: list[RunSpec] = []    # Phase 2
 
     for target in cfg.targets:
-        for scenario in target.scenarios:
-            if scenario == "cold-start":
-                # Phase 0 — cold-start preko target-a. Bez warmup-a (cilj je hladno).
-                # Iteration broj je samo 1..N (svaka sesija po jednu mjerenje na cold instanci;
-                # za vise cold mjerenja u kratkom periodu treba namerno cekanje 5-15 min,
-                # sto se postize dedicated full-mode runom van orchestrator-a).
-                for n in range(1, cfg.iterations + 1):
-                    cold_starts.append(
+        for sspec in target.scenarios:
+            # Svaki sweep unos se ekspanduje u 1+ (env_overrides, tag) — bez sweep-a
+            # je [((), "")] pa je ponasanje identicno ranijem (glavna kampanja netaknuta).
+            for env_overrides, sweep_tag in expand_sweep(sspec.sweep):
+                if sspec.name == "cold-start":
+                    # Phase 0 — cold-start preko target-a. Bez warmup-a (cilj je hladno).
+                    # Iteration broj je samo 1..N (svaka sesija po jednu mjerenje na cold instanci;
+                    # za vise cold mjerenja u kratkom periodu treba namerno cekanje 5-15 min,
+                    # sto se postize dedicated full-mode runom van orchestrator-a).
+                    for n in range(1, cfg.iterations + 1):
+                        cold_starts.append(
+                            RunSpec(
+                                target=target,
+                                scenario=sspec.name,
+                                iteration=n,
+                                session_id=session_id,
+                                session_timestamp=session_ts,
+                                env_overrides=env_overrides,
+                                sweep_tag=sweep_tag,
+                            )
+                        )
+                    continue
+
+                # Phase 1 + 2 za non-cold-start scenarije
+                for w in range(cfg.warmup_runs):
+                    warmups.append(
                         RunSpec(
                             target=target,
-                            scenario=scenario,
+                            scenario=sspec.name,
+                            iteration=0,
+                            session_id=session_id,
+                            session_timestamp=session_ts,
+                            env_overrides=env_overrides,
+                            sweep_tag=sweep_tag,
+                        )
+                    )
+                for n in range(1, cfg.iterations + 1):
+                    measurements.append(
+                        RunSpec(
+                            target=target,
+                            scenario=sspec.name,
                             iteration=n,
                             session_id=session_id,
                             session_timestamp=session_ts,
+                            env_overrides=env_overrides,
+                            sweep_tag=sweep_tag,
                         )
                     )
-                continue
-
-            # Phase 1 + 2 za non-cold-start scenarije
-            for w in range(cfg.warmup_runs):
-                warmups.append(
-                    RunSpec(
-                        target=target,
-                        scenario=scenario,
-                        iteration=0,
-                        session_id=session_id,
-                        session_timestamp=session_ts,
-                    )
-                )
-            for n in range(1, cfg.iterations + 1):
-                measurements.append(
-                    RunSpec(
-                        target=target,
-                        scenario=scenario,
-                        iteration=n,
-                        session_id=session_id,
-                        session_timestamp=session_ts,
-                    )
-                )
 
     rng.shuffle(cold_starts)
     rng.shuffle(measurements)
@@ -256,13 +319,18 @@ def k6_command(spec: RunSpec) -> list[str]:
         "-e", f"K6_RESULTS_DIR={spec.results_dir.as_posix()}",
         "-e", f"RUN_NUMBER={spec.iteration}",
     ]
+    # Sweep parametri (npr. -e IO_BYTES=1048576) — prazno za obicne scenarije.
+    sweep_args = []
+    for param, val in spec.env_overrides:
+        sweep_args += ["-e", f"{param}={val}"]
+
     # --no-thresholds: k6 thresholds (p95<2000 itd.) su CI-gating koncept; za
     # benchmark zelimo da zabelezimo latenciju BEZ OBZIRA koliko je visoka.
     # Bez ovog flag-a, spori runovi (npr. AWS io-native ~7s) vracaju exit 99
     # (threshold crossed) i orchestrator ih lazno markira kao failure iako su
     # podaci validni i kompletni. Error rate / latencija se ionako belaze kao
     # metrike u analysis.json.
-    return ["k6", "run", "--no-thresholds", *env_args, *scenario_args, script]
+    return ["k6", "run", "--no-thresholds", *env_args, *scenario_args, *sweep_args, script]
 
 
 def execute(spec: RunSpec, cfg: Config, dry_run: bool) -> dict:
