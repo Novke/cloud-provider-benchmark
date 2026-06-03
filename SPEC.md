@@ -345,8 +345,8 @@ Sledeci korak: pokretanje stvarne N=10 sesije, ili prelazak na Phase 2 (VPS auto
 - ✅ Deploy install vodic — `deploy/systemd/README.md` (Ubuntu/Debian step-by-step)
 - ✅ Auto-derivane stratifikacione kolone u DuckDB: `time_of_day_slot`, `day_of_week`, `is_weekend`
 - ✅ Phase 1 + Phase 2 cleanly povezane: `benchmark@.service` ExecStartPost pokrece aggregator automatski
-- 🔜 Setup Linux VPS (npr. Hetzner CCX13 ili druga lokacija) — kad korisnik bude spreman
-- 🔜 Cost cap setup (billing alerts kod sva 3 cloud provajdera)
+- ✅ Setup Linux VPS — **DigitalOcean Frankfurt** (`104.248.251.238`, s-1vcpu-1gb) deployed 2026-05-29 (vidi Sekciju 10 + `resources/Specifikacije infrastrukture.md`)
+- 🔜 Cost cap setup (billing alerts kod sva 3 cloud provajdera) — safety net, korisnik postavlja preko portala (trosak ~$150 omeđen)
 
 Verifikacija na postojecim podacima:
 ```
@@ -397,9 +397,33 @@ Output u `k6/results/_analysis/`: `summary.csv`, `mannwhitney_pairs.csv`, `krusk
 
 ---
 
+## 10. PRODUKCIJSKA KAMPANJA — LIVE (start 2026-06-03) 🟢
+
+Posle validacione faze (svi pipeline/storage/cold-start fixovi rešeni + verifikovani — vidi `resources/Nalazi i dnevnik.md` #11/#12/#13), prava merna kampanja je **zakazana i radi automatski**.
+
+**Validaciona faza — rešeni problemi:**
+- ✅ `8a7837b` orchestrate exit-code (partial fail više ne maskira uspeh / ne preskače aggregate)
+- ✅ `b0d1471` storage client-reuse (redeploy ×10; IaaS verifikacija: Azure native @50VU 11354→129ms 88×, AWS S3 10656ms+23%err→68ms+0err 156×) — storage confound eliminisan
+- ✅ `3d62ec0` cold-start health-skip (sad hvata prave cold start-ove: Lambda 1.6s … Azure Container Apps 26.5s)
+- ✅ `31577cc` orchestrate sweep support (parametrizovani scenariji) + `orchestrate.config.sweep.example.yaml`
+
+**Kampanja (dizajn — finalan, vidi `Metodologija testiranja.md` §4):**
+- **2 slota/dan** (`day` 09:00 + `night` 21:00 CEST) × **14 dana = N=28/cell**. (2 ne 3 slota: sesija ~8h, 3×8h ne staje u 24h.)
+- 10 targeta × 5 scenarija (low-traffic, heavy-compute, io-native, io-neutral, cold-start), io=1KB, compute=100K.
+- VPS systemd: `benchmark-day.timer`@09:00 + `benchmark-night.timer`@21:00 → `benchmark@.service` (campaign config = validirani sanity; ExecStartPost aggregate).
+- Start Jun 3 09:00 → kraj ~Jun 17.
+
+**Ostaje (post-kampanja, nije hitno):**
+- 🔜 Sweep pipeline finiš: `aggregate.py` kolone (io_bytes/compute_iterations/max_vus) + `analyze.py` scaling plotovi + `loadcurve`/`coldstart-window` config-ovi. Sweepovi (Eksp 2-5) se pokreću POSLE 14-dnevne kampanje (dedicated batch).
+- 🔜 Write-up (`resources/Struktura naucnog rada.md`) posle prikupljanja N=28.
+
+**Monitoring** (`Metodologija testiranja.md` §11): `systemctl list-timers benchmark*`, `journalctl -u 'benchmark@*'`, dnevni DuckDB N-check. Sync baze: `scp ...:/opt/cloud-provider-benchmark/benchmark.duckdb .`
+
+---
+
 ## 9. Kako da nastavis fresh
 
-1. **Procitaj ovaj SPEC.md prvi** (cita se za ~5 min)
+1. **Procitaj ovaj SPEC.md prvi** (cita se za ~5 min) — **Sekcija 10 je trenutno stanje (kampanja LIVE)**
 2. Otvori `resources/Nalazi i dnevnik.md` — najnoviji unos je trenutno stanje
 3. Identificuj na koji TODO si stao (Section 2-8 above)
 4. Pitaj Claude (ili sam pokreni) i kreni dalje
