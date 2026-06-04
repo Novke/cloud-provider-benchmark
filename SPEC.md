@@ -411,7 +411,8 @@ Posle validacione faze (svi pipeline/storage/cold-start fixovi rešeni + verifik
 - **2 slota/dan** (`day` 09:00 + `night` 21:00 CEST) × **14 dana = N=28/cell**. (2 ne 3 slota: sesija ~8h, 3×8h ne staje u 24h.)
 - 10 targeta × 5 scenarija (low-traffic, heavy-compute, io-native, io-neutral, cold-start), io=1KB, compute=100K.
 - VPS systemd: `benchmark-day.timer`@09:00 + `benchmark-night.timer`@21:00 → `benchmark@.service` (campaign config = validirani sanity; ExecStartPost aggregate).
-- Start Jun 3 09:00 → kraj ~Jun 17.
+- ✅ `1b9387d` systemd `TimeoutStartSec` 3h→10h fix — oneshot servis je ubijao ~8h sesiju na 3h; prva 2 slota (Jun 3) izgubljena. Detalji: `Nalazi i dnevnik.md` #14.
+- **Efektivni start Jun 4 09:00** (Jun 3 slotovi pali na timeout) → kraj ~Jun 18.
 
 **Ostaje (post-kampanja, nije hitno):**
 - 🔜 Sweep pipeline finiš: `aggregate.py` kolone (io_bytes/compute_iterations/max_vus) + `analyze.py` scaling plotovi + `loadcurve`/`coldstart-window` config-ovi. Sweepovi (Eksp 2-5) se pokreću POSLE 14-dnevne kampanje (dedicated batch).
