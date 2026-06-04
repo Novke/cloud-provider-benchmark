@@ -18,5 +18,6 @@ ExecStartPost=/usr/bin/python3 /opt/cloud-provider-benchmark/scripts/aggregate.p
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=benchmark-%i
-TimeoutStartSec=10800
+# sesija traje ~8h (validacija) — 10h ceiling daje 2h marginu i sprecava day/night overlap
+TimeoutStartSec=36000
 Restart=no
